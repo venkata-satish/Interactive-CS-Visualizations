@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Local vs Remote Replication Procedural Engine</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 20px 0;
+    font-size: 0.9rem;
+    color: #555555;
+  }
+  .layout-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .panel {
+    border: 2px solid #000000;
+    padding: 15px;
+    box-sizing: border-box;
+    background: #ffffff;
+    min-height: 480px;
+  }
+  .controls-panel {
+    width: 320px;
+    background: #eeeeee;
+  }
+  .canvas-container {
+    border: 2px solid #000000;
+    background: #ffffff;
+  }
+  .info-panel {
+    width: 400px;
+  }
+  .btn-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 10px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: left;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .action-btn {
+    background: #000000;
+    color: #ffffff;
+    text-align: center;
+    width: 100%;
+    margin-top: 10px;
+  }
+  .action-btn:hover {
+    background: #333333;
+  }
+  .metric-box {
+    background: #eeeeee;
+    padding: 10px;
+    border-left: 4px solid #000000;
+    margin: 12px 0;
+    font-size: 0.85rem;
+  }
+  .badge {
+    display: inline-block;
+    background: #000000;
+    color: #ffffff;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    margin-top: 5px;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Module 5: Replication Procedural Visualizer</h1>
+<p class="sub">Select a replication configuration model to simulate live host I/O operations and structural data tracking pathways.</p>
+
+<div class="layout-grid">
+  <!-- Interactive Controller Block -->
+  <div class="panel controls-panel">
+    <h3>Replication Topologies</h3>
+    <div class="btn-stack">
+      <button id="btnLocal" class="active">
+        <b>1. Local Replication</b><br/>
+        <small>Same Data Center (Array Snapshots/Clones)</small>
+      </button>
+      <button id="btnRemoteSync">
+        <b>2. Remote: Synchronous</b><br/>
+        <small>Real-time Mirroring (Zero RPO, High Latency)</small>
+      </button>
+      <button id="btnRemoteAsync">
+        <b>3. Remote: Asynchronous</b><br/>
+        <small>Buffered / Delayed Batches (Low Latency)</small>
+      </button>
+    </div>
+    <hr style="border:0; border-top:1px solid #000; margin: 20px 0;">
+    <button id="btnTrigger" class="action-btn">▶ Trigger Host I/O Write</button>
+  </div>
+
+  <!-- Graphic Animation Area -->
+  <div class="canvas-container">
+    <canvas id="repCanvas" width="420" height="480"></canvas>
+  </div>
+
+  <!-- Operational Metric Summary Dashboard -->
+  <div class="panel info-panel">
+    <h3>Operational State Dashboard</h3>
+    <div id="metricOutput">Loading configuration profile...</div>
+    
+    <h3 style="margin-top:25px;">Data Link Architecture Logs</h3>
+    <div id="traceLog" style="font-size:0.85rem; line-height:1.5; color:#222;">
+      Select an architectural replication mode and click write to analyze structural execution loops.
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('repCanvas');
+const ctx = canvas.getContext('2d');
+const metricOutput = document.getElementById('metricOutput');
+const traceLog = document.getElementById('traceLog');
+
+let currentMode = "LOCAL"; // LOCAL, SYNC, ASYNC
+let animationFrame = -1;
+let animTimer = null;
+let ioPacket = { x: 60, y: 70, progress: 0 };
+
+const profiles = {
+  LOCAL: {
+    title: "Local Replication Architecture",
+    rpo: "Near-Zero (At point of clone capture)",
+    rto: "Minutes (Rapid local restore capability)",
+    distance: "0 km (Intra-array bus connectivity)",
+    desc: "<b>Execution Loop:</b> The Production Host issues a write command. The local storage subsystem writes to the production disk and simultaneously fires an internal memory pointer redirection to populate the <b>Local Replica (Snapshot/BCV)</b> within the same frame."
+  },
+  SYNC: {
+    title: "Remote Synchronous Mirroring",
+    rpo: "Strictly Zero Data Loss Guarantee",
+    rto: "Minutes to Hours (Requires remote site spin up)",
+    distance: "< 200 km (Constrained by light speed fiber propagation latency)",
+    desc: "<b>Execution Loop:</b> Host issues write ➔ Primary Array receives data ➔ Primary mirrors data across WAN fabric to Remote Array ➔ Remote acknowledges Primary ➔ Primary finally acknowledges the Host. **Host waits for the round trip.**"
+  },
+  ASYNC: {
+    title: "Remote Asynchronous Mirroring",
+    rpo: "Minutes to Hours (Depends on buffer interval)",
+    rto: "Minutes to Hours",
+    distance: "Unlimited (Global crossing capability)",
+    desc: "<b>Execution Loop:</b> Host issues write ➔ Primary Array commits data locally and <b>immediately acknowledges the Host</b>. The data is buffered in local cache and transferred to the Remote DR site asynchronously in scheduled delta batches."
+  }
+};
+
+function switchMode(mode) {
+  clearInterval(animTimer);
+  currentMode = mode;
+  animationFrame = -1;
+  
+  document.getElementById('btnLocal').className = mode === "LOCAL" ? "active" : "";
+  document.getElementById('btnRemoteSync').className = mode === "SYNC" ? "active" : "";
+  document.getElementById('btnRemoteAsync').className = mode === "ASYNC" ? "active" : "";
+  
+  const p = profiles[mode];
+  metricOutput.innerHTML = `
+    <span class="badge">${p.title}</span>
+    <div class="metric-box"><b>Recovery Point Objective (RPO):</b> ${p.rpo}</div>
+    <div class="metric-box"><b>Recovery Time Objective (RTO):</b> ${p.rto}</div>
+    <div class="metric-box"><b>Distance Limit constraints:</b> ${p.distance}</div>
+  `;
+  traceLog.innerHTML = p.desc;
+  
+  drawTopology();
+}
+
+function drawTopology() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Site Boundaries Box Graphics
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(15, 120, 175, 330);
+  ctx.fillStyle = "#555555"; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
+  ctx.fillText("PRODUCTION SITE A", 102, 138);
+
+  if (currentMode !== "LOCAL") {
+    ctx.strokeStyle = "#000000";
+    ctx.strokeRect(230, 120, 175, 330);
+    ctx.fillStyle = "#555555";
+    ctx.fillText("REMOTE DR SITE B", 317, 138);
+    
+    // WAN Pipeline
+    ctx.strokeStyle = "#cccccc"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(190, 290); ctx.lineTo(230, 290); ctx.stroke();
+    ctx.fillStyle = "#666666"; ctx.font = "8px monospace";
+    ctx.fillText("WAN FABRIC", 210, 282);
+  }
+
+  // Draw Primary Elements
+  drawComponent(65, 40, 75, 30, "Prod Host", "#ffffff");
+  drawComponent(65, 200, 75, 45, "Primary Array\nController", "#eeeeee");
+  drawComponent(65, 340, 75, 40, "Production\nLUN", "#ffffff");
+
+  // Host to Controller Connection Path
+  drawArrow(102, 70, 102, 200, "", "#000");
+
+  if (currentMode === "LOCAL") {
+    // Local replication element layout within Site A boundary
+    drawComponent(145, 340, 55, 40, "Local\nReplica", "#ffffff");
+    drawArrow(102, 245, 102, 340, "", "#000"); // To Prod
+    drawArrow(102, 225, 145, 340, "Redirection", "#666"); // To Snap
+  } else {
+    // Remote elements mapping layout
+    drawComponent(280, 200, 75, 45, "Remote Array\nController", "#eeeeee");
+    drawComponent(280, 340, 75, 40, "Remote DR\nLUN", "#ffffff");
+    
+    drawArrow(102, 245, 102, 340, "", "#000"); // Prod Array to Prod LUN
+    drawArrow(140, 222, 280, 222, "Mirror", "#000"); // Inter-controller link
+    drawArrow(317, 245, 317, 340, "", "#000"); // Remote controller to LUN
+  }
+
+  // Animate dynamic tracking elements
+  renderDynamicPackets();
+}
+
+function drawComponent(x, y, w, h, label, bg) {
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 2;
+  ctx.fillStyle = bg;
+  ctx.fillRect(x, y, w, h); ctx.strokeRect(x, y, w, h);
+  
+  ctx.fillStyle = "#000000"; ctx.font = "9px monospace"; ctx.textAlign = "center";
+  let lines = label.split('\n');
+  if(lines.length === 1) {
+    ctx.fillText(label, x + w/2, y + h/2 + 3);
+  } else {
+    ctx.fillText(lines[0], x + w/2, y + h/2 - 3);
+    ctx.fillText(lines[1], x + w/2, y + h/2 + 7);
+  }
+}
+
+function drawArrow(x1, y1, x2, y2, label, color) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  let dx = x2 - x1, dy = y2 - y1;
+  let angle = Math.atan2(dy, dx);
+  ctx.beginPath(); ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 5 * Math.cos(angle - Math.PI/6), y2 - 5 * Math.sin(angle - Math.PI/6));
+  ctx.lineTo(x2 - 5 * Math.cos(angle + Math.PI/6), y2 - 5 * Math.sin(angle + Math.PI/6));
+  ctx.fill();
+  if(label) {
+    ctx.font = "8px monospace";
+    ctx.fillText(label, (x1+x2)/2, Math.min(y1,y2) - 4);
+  }
+}
+
+function renderDynamicPackets() {
+  if (animationFrame < 0) return;
+
+  ctx.fillStyle = "#ff0000";
+  ctx.strokeStyle = "#ff0000";
+
+  if (currentMode === "LOCAL") {
+    if (animationFrame <= 20) {
+      // Packet dropping down from Host to Controller
+      let pct = animationFrame / 20;
+      drawCircle(102, 70 + (130 * pct));
+    } else if (animationFrame <= 40) {
+      // Splitting to Local Disk and Local Snapshot concurrently
+      let pct = (animationFrame - 20) / 20;
+      drawCircle(102, 245 + (95 * pct)); // Down path
+      drawCircle(102 + (43 * pct), 225 + (115 * pct)); // Redirection path
+    } else if (animationFrame <= 55) {
+      // Return Ack to Host
+      let pct = (animationFrame - 40) / 15;
+      ctx.strokeStyle = "#00aa00"; drawCircle(102, 200 - (130 * pct));
+    }
+  } 
+  
+  else if (currentMode === "SYNC") {
+    if (animationFrame <= 15) {
+      let pct = animationFrame / 15;
+      drawCircle(102, 70 + (130 * pct));
+    } else if (animationFrame <= 35) {
+      let pct = (animationFrame - 15) / 20;
+      drawCircle(102 + (178 * pct), 222); // Moving across WAN to DR controller
+      drawCircle(102, 245 + (95 * pct)); // Commit locally
+    } else if (animationFrame <= 50) {
+      let pct = (animationFrame - 35) / 15;
+      drawCircle(317, 245 + (95 * pct)); // Commit to remote disk
+    } else if (animationFrame <= 65) {
+      let pct = (animationFrame - 50) / 15;
+      ctx.strokeStyle = "#0000ff"; // Remote acknowledgement path returning
+      drawCircle(280 - (178 * pct), 222);
+    } else if (animationFrame <= 80) {
+      let pct = (animationFrame - 65) / 15;
+      ctx.strokeStyle = "#00aa00"; // Final client acknowledgement released
+      drawCircle(102, 200 - (130 * pct));
+    }
+  } 
+  
+  else if (currentMode === "ASYNC") {
+    if (animationFrame <= 15) {
+      let pct = animationFrame / 15;
+      drawCircle(102, 70 + (130 * pct));
+    } else if (animationFrame <= 30) {
+      let pct = (animationFrame - 15) / 15;
+      drawCircle(102, 245 + (95 * pct)); // Commit locally
+    } else if (animationFrame <= 45) {
+      let pct = (animationFrame - 30) / 15;
+      ctx.strokeStyle = "#00aa00"; // Immediate local acknowledgment back to host
+      drawCircle(102, 200 - (130 * pct));
+    } else if (animationFrame <= 65) {
+      let pct = (animationFrame - 45) / 20;
+      ctx.fillStyle = "#ffaa00"; ctx.strokeStyle = "#ffaa00"; // Periodic buffered batch transfer updates
+      drawCircle(102 + (178 * pct), 222);
+    } else if (animationFrame <= 80) {
+      let pct = (animationFrame - 65) / 15;
+      ctx.fillStyle = "#ffaa00"; ctx.strokeStyle = "#ffaa00";
+      drawCircle(317, 245 + (95 * pct)); // Commit data packet safely down into secondary DR LUN
+    }
+  }
+}
+
+function drawCircle(x, y) {
+  ctx.beginPath(); ctx.arc(x, y, 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+}
+
+function triggerIO() {
+  clearInterval(animTimer);
+  animationFrame = 0;
+  
+  let limit = currentMode === "LOCAL" ? 55 : 80;
+  
+  animTimer = setInterval(() => {
+    if (animationFrame > limit) {
+      clearInterval(animTimer);
+      animationFrame = -1;
+      drawTopology();
+      return;
+    }
+    drawTopology();
+    animationFrame++;
+  }, 45);
+}
+
+document.getElementById('btnLocal').addEventListener('click', () => switchMode('LOCAL'));
+document.getElementById('btnRemoteSync').addEventListener('click', () => switchMode('SYNC'));
+document.getElementById('btnRemoteAsync').addEventListener('click', () => switchMode('ASYNC'));
+document.getElementById('btnTrigger').addEventListener('click', triggerIO);
+
+// Load Baseline Defaults
+switchMode('LOCAL');
+</script>
+</body>
+</html>

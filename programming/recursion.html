@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Call Stack & Recursion Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+  }
+  .controls {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 2px solid #000000;
+    display: inline-flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 6px 14px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    text-decoration: line-through;
+  }
+  .workspace {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+  .canvas-border {
+    border: 2px solid #000000;
+    display: inline-block;
+    background: #ffffff;
+  }
+  .status-box {
+    margin-top: 25px;
+    padding: 10px;
+    border: 2px solid #000000;
+    width: 100%;
+    max-width: 800px;
+    min-height: 60px;
+    box-sizing: border-box;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<h1>Call Stack & Recursion Visualizer</h1>
+<p class="sub">Watch how the computer builds execution stack frames in memory during standard calls, recursive loops, and system breakdowns.</p>
+
+<div class="controls">
+  <button id="btnStandard">Run Standard Calls</button>
+  <button id="btnFactorial">Run Recursive Factorial (3!)</button>
+  <button id="btnOverflow">Trigger Stack Overflow</button>
+</div>
+
+<div class="workspace">
+  <div class="canvas-border">
+    <canvas id="stackCanvas" width="800" height="480"></canvas>
+  </div>
+</div>
+
+<div class="status-box" id="statusBox">
+  Select an execution scenario above to trace stack frames step-by-step.
+</div>
+
+<script>
+const canvas = document.getElementById('stackCanvas');
+const ctx = canvas.getContext('2d');
+const statusBox = document.getElementById('statusBox');
+const buttons = document.querySelectorAll('.controls button');
+
+let stack = [];
+let timeline = [];
+let timelineIndex = 0;
+let timerId = null;
+
+// Helper to disable buttons during operations
+function setControls(disabled) {
+  buttons.forEach(b => b.disabled = disabled);
+}
+
+// Draw the boundary lines of the hardware stack area
+function drawStackContainer() {
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3;
+  
+  // Left wall, bottom floor, right wall of stack zone
+  ctx.beginPath();
+  ctx.moveTo(450, 40);
+  ctx.lineTo(450, 440);
+  ctx.lineTo(750, 440);
+  ctx.lineTo(750, 440 - 400);
+  ctx.stroke();
+  
+  ctx.fillStyle = '#666666';
+  ctx.font = '11px monospace';
+  ctx.fillText("HIGH MEMORY ADDRESS (Stack Bottom)", 470, 455);
+  ctx.fillText("LOW MEMORY ADDRESS (Stack Growth ↑)", 470, 30);
+}
+
+function drawFrame(x, y, w, h, title, vars, isActive) {
+  ctx.fillStyle = isActive ? '#000000' : '#ffffff';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeRect(x, y, w, h);
+  
+  // Header underline split
+  ctx.strokeStyle = isActive ? '#ffffff' : '#000000';
+  ctx.beginPath();
+  ctx.moveTo(x, y + 25);
+  ctx.lineTo(x + w, y + 25);
+  ctx.stroke();
+  
+  // Frame Title
+  ctx.fillStyle = isActive ? '#ffffff' : '#000000';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText(title, x + 10, y + 17);
+  
+  // Frame variables list values inside slots
+  ctx.font = '11px monospace';
+  vars.forEach((v, idx) => {
+    ctx.fillText(v, x + 12, y + 42 + (idx * 16));
+  });
+}
+
+function render(activeFrameTitle = "", codeSnippet = []) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawStackContainer();
+  
+  // Draw current Pseudocode executing panel block on the left side
+  ctx.fillStyle = '#eeeeee';
+  ctx.fillRect(20, 40, 380, 400);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, 40, 380, 400);
+  
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillText("EXECUTION SOURCE MONITOR", 35, 65);
+  
+  ctx.font = '12px monospace';
+  codeSnippet.forEach((line, index) => {
+    if (line.isActive) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(30, 85 + (index * 20), 360, 18);
+      ctx.fillStyle = '#ffffff';
+    } else {
+      ctx.fillStyle = '#000000';
+    }
+    ctx.fillText(line.text, 35, 98 + (index * 20));
+  });
+
+  // Render Stack elements building upwards from bottom baseline coordinate 440
+  let currentY = 440;
+  stack.forEach((frame, idx) => {
+    const frameHeight = 32 + (frame.vars.length * 16);
+    currentY -= frameHeight + 4; // Shift coordinate up for next block positioning
+    
+    const isTopFrame = (idx === stack.length - 1);
+    drawFrame(454, currentY, 292, frameHeight, frame.title, frame.vars, isTopFrame);
+  });
+}
+
+function processTimelineStep() {
+  if (timelineIndex >= timeline.length) {
+    setControls(false);
+    statusBox.innerHTML = "<b>Execution Completed:</b> The call stack is entirely cleared back to system operational baseline status.";
+    return;
+  }
+  
+  const step = timeline[timelineIndex];
+  stack = step.stackState;
+  statusBox.innerHTML = step.msg;
+  render(step.activeFrame, step.codeLines);
+  
+  timelineIndex++;
+  timerId = setTimeout(processTimelineStep, 1600); // Frame transformation time limit gap
+}
+
+// --- CONTROLLER 1: STANDARD NESTED FUNCTION CALLS SEQUENCE ---
+document.getElementById('btnStandard').addEventListener('click', () => {
+  setControls(true);
+  timelineIndex = 0;
+  timeline = [];
+
+  const code = [
+    { text: "void main() {", isActive: false },
+    { text: "  funcA();", isActive: false },
+    { text: "}", isActive: false },
+    { text: "void funcA() {", isActive: false },
+    { text: "  int a = 10;", isActive: false },
+    { text: "  funcB(a);", isActive: false },
+    { text: "}", isActive: false },
+    { text: "void funcB(int val) {", isActive: false },
+    { text: "  int result = val * 2;", isActive: false },
+    { text: "}" }
+  ];
+
+  function getLines(activeIdx) {
+    return code.map((c, idx) => ({ text: c.text, isActive: idx === activeIdx }));
+  }
+
+  timeline.push({ stackState: [], activeFrame: "", codeLines: getLines(0), msg: "Program initiates processing runtime environment." });
+  
+  let s1 = [{ title: "main()", vars: ["retAddr: OS"] }];
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s1)), activeFrame: "main", codeLines: getLines(1), msg: "<b>Push:</b> <tt>main()</tt> stack frame drops down into bottom slot memory allocation space." });
+  
+  let s2 = [...s1, { title: "funcA()", vars: ["retAddr: main", "int a = 10"] }];
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s2)), activeFrame: "funcA", codeLines: getLines(4), msg: "<b>Push:</b> <tt>main()</tt> calls <tt>funcA()</tt>. New distinct frame added with local variable <tt>a</tt>." });
+  
+  let s3 = [...s2, { title: "funcB()", vars: ["retAddr: funcA", "int val = 10", "int result = 20"] }];
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s3)), activeFrame: "funcB", codeLines: getLines(8), msg: "<b>Push:</b> <tt>funcA()</tt> redirects scope execution path down to <tt>funcB()</tt>. Parameters push inline." });
+  
+  // Pop operations cascade downward sequence
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s2)), activeFrame: "funcA", codeLines: getLines(5), msg: "<b>Pop:</b> <tt>funcB()</tt> finishes, popping off stack frame completely. Control jumps to return address." });
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s1)), activeFrame: "main", codeLines: getLines(2), msg: "<b>Pop:</b> <tt>funcA()</tt> frame destroyed. Control safely back inside main scope area block." });
+  timeline.push({ stackState: [], activeFrame: "", codeLines: getLines(2), msg: "<b>Pop:</b> <tt>main()</tt> exits out. Hardware resources freed back up." });
+
+  processTimelineStep();
+});
+
+// --- CONTROLLER 2: RECURSIVE FACTORIAL SEQUENCE ---
+document.getElementById('btnFactorial').addEventListener('click', () => {
+  setControls(true);
+  timelineIndex = 0;
+  timeline = [];
+
+  const code = [
+    { text: "int fact(int n) {", isActive: false },
+    { text: "  if (n <= 1) return 1; // Base Case", isActive: false },
+    { text: "  return n * fact(n - 1);", isActive: false },
+    { text: "}" }
+  ];
+
+  function getLines(activeIdx) {
+    return code.map((c, idx) => ({ text: c.text, isActive: idx === activeIdx }));
+  }
+
+  let s = [{ title: "fact(n=3)", vars: ["retAddr: main"] }];
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s)), activeFrame: "fact3", codeLines: getLines(2), msg: "<b>Recursion Phase 1:</b> Initial call <tt>fact(3)</tt>. Condition <tt>3 <= 1</tt> fails, triggering downward call branch." });
+  
+  s.push({ title: "fact(n=2)", vars: ["retAddr: fact(3)"] });
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s)), activeFrame: "fact2", codeLines: getLines(2), msg: "<b>Recursion Phase 2:</b> <tt>fact(3)</tt> halts to push <tt>fact(2)</tt> tracking frame onto the stack." });
+  
+  s.push({ title: "fact(n=1)", vars: ["retAddr: fact(2)"] });
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s)), activeFrame: "fact1", codeLines: getLines(1), msg: "<b>Base Case Reached:</b> <tt>fact(1)</tt> runs. Condition <tt>1 <= 1</tt> checks out true! It will return <b>1</b> without calling anything further." });
+  
+  // Unwinding cascading operations
+  s.pop(); 
+  s[1].vars.push("returned: 1");
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s)), activeFrame: "fact2", codeLines: getLines(2), msg: "<b>Unwinding:</b> <tt>fact(1)</tt> returns value 1 and pops off. Now <tt>fact(2)</tt> resumes to evaluate: <tt>2 * 1 = 2</tt>." });
+  
+  s.pop();
+  s[0].vars.push("returned: 2");
+  timeline.push({ stackState: JSON.parse(JSON.stringify(s)), activeFrame: "fact3", codeLines: getLines(2), msg: "<b>Unwinding:</b> <tt>fact(2)</tt> clears out. <tt>fact(3)</tt> wakes up to evaluate the terminal expression step: <tt>3 * 2 = 6</tt>." });
+  
+  timeline.push({ stackState: [], activeFrame: "", codeLines: getLines(0), msg: "Final answer <b>6</b> returned to system output dashboard frame." });
+
+  processTimelineStep();
+});
+
+// --- CONTROLLER 3: STACK OVERFLOW SIMULATION ---
+document.getElementById('btnOverflow').addEventListener('click', () => {
+  setControls(true);
+  timelineIndex = 0;
+  timeline = [];
+
+  const code = [
+    { text: "void broken() {", isActive: false },
+    { text: "  broken(); // Missing Base Case!", isActive: false },
+    { text: "}" }
+  ];
+
+  function getLines(activeIdx) {
+    return code.map((c, idx) => ({ text: c.text, isActive: idx === activeIdx }));
+  }
+
+  let s = [];
+  for (let i = 1; i <= 7; i++) {
+    s.push({ title: `broken() [Call #${i}]`, vars: ["retAddr: broken()"] });
+    timeline.push({ 
+      stackState: JSON.parse(JSON.stringify(s)), 
+      activeFrame: "broken", 
+      codeLines: getLines(1), 
+      msg: `<b>Infinite Loop Growth:</b> Pushing frame #${i}. Without a conditional exit barrier check, allocation continues rising indefinitely.` 
+    });
+  }
+  
+  // Final payload crash frame mapping step
+  timeline.push({ 
+    stackState: JSON.parse(JSON.stringify(s)), 
+    activeFrame: "crash", 
+    codeLines: getLines(1), 
+    msg: "<b style='color:#ff0000;'>💥 CRASH: STACK OVERFLOW!</b> The execution framework breached the maximum allowed stack boundary lines. Core segment memory dump triggered." 
+  });
+
+  processTimelineStep();
+});
+
+// Initial canvas viewport baseline rendering configuration pass
+render("", []);
+</script>
+
+</body>
+</html>

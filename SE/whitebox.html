@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Control Flow Graph & Basis Path Testing Simulator</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 20px 0;
+    font-size: 0.9rem;
+    color: #555555;
+  }
+  .layout-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .panel {
+    border: 2px solid #000000;
+    padding: 15px;
+    box-sizing: border-box;
+    background: #ffffff;
+    min-height: 520px;
+  }
+  .code-panel {
+    width: 320px;
+    background: #eeeeee;
+  }
+  pre {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  .code-line {
+    padding: 2px 4px;
+    display: block;
+  }
+  .code-line.active-line {
+    background: #000000;
+    color: #ffffff;
+    font-weight: bold;
+  }
+  .canvas-container {
+    border: 2px solid #000000;
+    background: #ffffff;
+  }
+  .math-panel {
+    width: 440px;
+  }
+  .math-box {
+    background: #eeeeee;
+    padding: 8px 12px;
+    border-left: 4px solid #000000;
+    margin: 10px 0;
+    font-size: 0.8rem;
+  }
+  .btn-row {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 8px 14px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .badge {
+    display: inline-block;
+    background: #000000;
+    color: #ffffff;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    margin-top: 8px;
+  }
+  .test-case-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.8rem;
+  }
+  .test-case-table th, .test-case-table td {
+    border: 1px solid #000000;
+    padding: 6px;
+    text-align: center;
+  }
+  .test-case-table tr.active-row {
+    background: #dddddd;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Control Flow Graph & Test Case Derivation Engine</h1>
+<p class="sub">Select an independent basis path to watch the execution run through the code blocks, graph trajectories, and test criteria inputs.</p>
+
+<div class="btn-row">
+  <button id="btnPath1" class="active">Path 1: Minor (Underage)</button>
+  <button id="btnPath2">Path 2: Experienced Adult</button>
+  <button id="btnPath3">Path 3: Inexperienced Adult</button>
+</div>
+
+<div class="layout-grid">
+  <!-- Code Block Module -->
+  <div class="panel code-panel">
+    <h3>Source Implementation</h3>
+    <hr style="border:0; border-top:1px solid #000; margin-bottom:10px;">
+    <pre>
+<span class="code-line" id="line1">int evaluate_tier(int age, int exp) {</span>
+<span class="code-line" id="line2">  int tier = 0;           // N1</span>
+<span class="code-line" id="line3">  if (age >= 18) {        // N2</span>
+<span class="code-line" id="line4">    if (exp > 5) {        // N3</span>
+<span class="code-line" id="line5">      tier = 2;           // N4</span>
+<span class="code-line" id="line6">    } else {</span>
+<span class="code-line" id="line7">      tier = 1;           // N5</span>
+<span class="code-line" id="line8">    }                     // N6 (Merge)</span>
+<span class="code-line" id="line9">  } else {</span>
+<span class="code-line" id="line10">    tier = 0;             // N7</span>
+<span class="code-line" id="line11">  }                       // N8 (Merge)</span>
+<span class="code-line" id="line12">  return tier;            // N9</span>
+}
+    </pre>
+    <div style="margin-top:20px;">
+      <button id="btnAnimate" style="width:100%; background:#000; color:#fff;">▶ Run Path Step Sequence</button>
+    </div>
+  </div>
+
+  <!-- Interactive Graphic Canvas -->
+  <div class="canvas-container">
+    <canvas id="cfgCanvas" width="360" height="520"></canvas>
+  </div>
+
+  <!-- Formula & Output Dashboard -->
+  <div class="panel math-panel">
+    <h3>Cyclomatic Complexity Framework</h3>
+    <div class="math-box">
+      <b>Edge-Node Metric:</b> M = E - N + 2P <br>
+      10 Edges - 9 Nodes + 2(1) Component = <b>M = 3 Basis Paths</b>
+    </div>
+    <div class="math-box">
+      <b>Predicate Decision Rule:</b> M = Decisions + 1 <br>
+      2 Conditional Splitting Checks (N2, N3) + 1 = <b>M = 3 Basis Paths</b>
+    </div>
+
+    <h3 style="margin-top:20px;">Derived Dynamic Test Suite Matrix</h3>
+    <table class="test-case-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Age Input</th>
+          <th>Exp Input</th>
+          <th>Expected Return</th>
+          <th>Target Verification Trace</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr id="rowTC1">
+          <td>TC-01</td>
+          <td>16</td>
+          <td>0</td>
+          <td>Tier 0</td>
+          <td>1 → 2 → 7 → 8 → 9</td>
+        </tr>
+        <tr id="rowTC2">
+          <td>TC-02</td>
+          <td>25</td>
+          <td>8</td>
+          <td>Tier 2</td>
+          <td>1 → 2 → 3 → 4 → 6 → 8 → 9</td>
+        </tr>
+        <tr id="rowTC3">
+          <td>TC-03</td>
+          <td>30</td>
+          <td>2</td>
+          <td>Tier 1</td>
+          <td>1 → 2 → 3 → 5 → 6 → 8 → 9</td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <div style="margin-top:20px;">
+      <b>Current Path Segment Action Logs:</b><br/>
+      <div id="statusReport" style="margin-top:5px; font-size:0.85rem; line-height:1.4;">Select a path matrix option above to start tracing configurations.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('cfgCanvas');
+const ctx = canvas.getContext('2d');
+const statusReport = document.getElementById('statusReport');
+
+let selectedPath = 1;
+let animationStep = -1;
+let animTimer = null;
+
+const paths = {
+  1: {
+    nodes: ["N1", "N2", "N7", "N8", "N9"],
+    lines: [[2], [3, 9, 10], [10], [11], [12]],
+    edges: ["E1", "E3", "E8", "E9"],
+    tcRow: "rowTC1",
+    desc: "<b>Path 1 Active (Minor Route):</b> The input (Age = 16) fails the predicate condition test at Node 2, jumping straight to the outer else assignment block."
+  },
+  2: {
+    nodes: ["N1", "N2", "N3", "N4", "N6", "N8", "N9"],
+    lines: [[2], [3], [4], [5], [8], [11], [12]],
+    edges: ["E1", "E2", "E4", "E6", "E7", "E9"],
+    tcRow: "rowTC2",
+    desc: "<b>Path 2 Active (Experienced Adult):</b> Age validation succeeds, and the nested evaluation for high professional experience (>5 years) evaluates to True."
+  },
+  3: {
+    nodes: ["N1", "N2", "N3", "N5", "N6", "N8", "N9"],
+    lines: [[2], [3], [4], [7], [8], [11], [12]],
+    edges: ["E1", "E2", "E5", "E6", "E7", "E9"],
+    tcRow: "rowTC3",
+    desc: "<b>Path 3 Active (Inexperienced Adult):</b> The applicant passes the core age framework requirement, but cascades down the secondary nested else routine due to standard entry experience parameters."
+  }
+};
+
+const graphNodes = {
+  N1: { label: "N1: Entry", x: 180, y: 40, type: "circle" },
+  N2: { label: "N2: Age>=18?", x: 180, y: 110, type: "diamond" },
+  N3: { label: "N3: Exp>5?", x: 100, y: 200, type: "diamond" },
+  N4: { label: "N4: Tier=2", x: 40, y: 290, type: "circle" },
+  N5: { label: "N5: Tier=1", x: 160, y: 290, type: "circle" },
+  N6: { label: "N6: Merge", x: 100, y: 370, type: "circle" },
+  N7: { label: "N7: Tier=0", x: 280, y: 240, type: "circle" },
+  N8: { label: "N8: Merge", x: 180, y: 430, type: "circle" },
+  N9: { label: "N9: Return", x: 180, y: 490, type: "circle" }
+};
+
+const graphEdges = {
+  E1: { from: "N1", to: "N2", lbl: "" },
+  E2: { from: "N2", to: "N3", lbl: "T" },
+  E3: { from: "N2", to: "N7", lbl: "F" },
+  E4: { from: "N3", to: "N4", lbl: "T" },
+  E5: { from: "N3", to: "N5", lbl: "F" },
+  E6: { from: "N4", to: "N6", lbl: "" },
+  E7: { from: "N5", to: "N6", lbl: "" },
+  E8: { from: "N7", to: "N8", lbl: "" },
+  E9: { from: "N6", to: "N8", lbl: "" },
+  E10: { from: "N8", to: "N9", lbl: "" }
+};
+
+function initPath(pathId) {
+  clearInterval(animTimer);
+  selectedPath = pathId;
+  animationStep = -1;
+  
+  document.querySelectorAll('.btn-row button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btnPath${pathId}`).classList.add('active');
+  
+  document.querySelectorAll('.test-case-table tr').forEach(r => r.classList.remove('active-row'));
+  document.getElementById(paths[pathId].tcRow).classList.add('active-row');
+  
+  statusReport.innerHTML = paths[pathId].desc + "<br/><br/><span class='badge'>Status: Ready. Click Run Path Sequence to animate.</span>";
+  
+  resetCodeHighlighting();
+  drawGraph();
+}
+
+function resetCodeHighlighting() {
+  document.querySelectorAll('.code-line').forEach(l => l.classList.remove('active-line'));
+}
+
+function highlightCodeLines(lineIndices) {
+  resetCodeHighlighting();
+  lineIndices.forEach(idx => {
+    const el = document.getElementById(`line${idx}`);
+    if(el) el.classList.add('active-line');
+  });
+}
+
+function drawGraph() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const pathConfig = paths[selectedPath];
+
+  // Draw region boundaries markers
+  ctx.fillStyle = "#bbbbbb";
+  ctx.font = "italic 10px sans-serif";
+  ctx.fillText("Region 1 (Inner Loop Area)", 35, 220);
+  ctx.fillText("Region 2 (Outer Condition Area)", 210, 340);
+  ctx.fillText("Region 3 (Global Background Plane)", 20, 480);
+
+  // Draw Connections
+  Object.keys(graphEdges).forEach(eKey => {
+    const edge = graphEdges[eKey];
+    const nFrom = graphNodes[edge.from];
+    const nTo = graphNodes[edge.to];
+    
+    let isActive = false;
+    if (animationStep >= 0) {
+      const pastNodes = pathConfig.nodes.slice(0, animationStep + 1);
+      const fromIdx = pastNodes.indexOf(edge.from);
+      if (fromIdx !== -1 && pastNodes[fromIdx + 1] === edge.to) {
+        isActive = true;
+      }
+    }
+
+    ctx.strokeStyle = isActive ? "#000000" : "#e0e0e0";
+    ctx.lineWidth = isActive ? 3 : 1.5;
+    ctx.fillStyle = isActive ? "#000000" : "#a0a0a0";
+    
+    drawArrow(nFrom.x, nFrom.y, nTo.x, nTo.y, edge.lbl);
+  });
+
+  // Draw Structural Nodes
+  Object.keys(graphNodes).forEach(nKey => {
+    const node = graphNodes[nKey];
+    let isNodeVisited = false;
+    let isCurrentlyActive = false;
+
+    if (animationStep >= 0) {
+      const idx = pathConfig.nodes.indexOf(nKey);
+      if (idx !== -1 && idx <= animationStep) isNodeVisited = true;
+      if (idx === animationStep) isCurrentlyActive = true;
+    }
+
+    ctx.lineWidth = isCurrentlyActive ? 3 : 1.5;
+    ctx.strokeStyle = (isNodeVisited || isCurrentlyActive) ? "#000000" : "#d0d0d0";
+    ctx.fillStyle = isCurrentlyActive ? "#000000" : (isNodeVisited ? "#eeeeee" : "#ffffff");
+
+    if (node.type === "diamond") {
+      ctx.beginPath();
+      ctx.moveTo(node.x, node.y - 18);
+      ctx.lineTo(node.x + 50, node.y);
+      ctx.lineTo(node.x, node.y + 18);
+      ctx.lineTo(node.x - 50, node.y);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, 16, 0, 2 * Math.PI);
+      ctx.fill(); ctx.stroke();
+    }
+
+    ctx.fillStyle = isCurrentlyActive ? "#ffffff" : "#000000";
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(nKey, node.x, node.y + 3);
+  });
+}
+
+function drawArrow(x1, y1, x2, y2, label) {
+  let dx = x2 - x1, dy = y2 - y1;
+  let angle = Math.atan2(dy, dx);
+  
+  let startOffsetX = Math.cos(angle) * 16;
+  let startOffsetY = Math.sin(angle) * 16;
+  let endOffsetX = Math.cos(angle) * 20;
+  let endOffsetY = Math.sin(angle) * 20;
+
+  let sx = x1 + startOffsetX;
+  let sy = y1 + startOffsetY;
+  let ex = x2 - endOffsetX;
+  let ey = y2 - endOffsetY;
+
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+  
+  ctx.beginPath(); ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - 6 * Math.cos(angle - Math.PI/6), ey - 6 * Math.sin(angle - Math.PI/6));
+  ctx.lineTo(ex - 6 * Math.cos(angle + Math.PI/6), ey - 6 * Math.sin(angle + Math.PI/6));
+  ctx.fill();
+
+  if(label) {
+    ctx.font = "bold 10px sans-serif";
+    ctx.fillText(label, (sx+ex)/2 - 8, (sy+ey)/2 - 4);
+  }
+}
+
+function runSequence() {
+  clearInterval(animTimer);
+  animationStep = 0;
+  const pathConfig = paths[selectedPath];
+
+  animTimer = setInterval(() => {
+    if (animationStep >= pathConfig.nodes.length) {
+      clearInterval(animTimer);
+      statusReport.innerHTML = "<b>Traversal Complete.</b> All nodes on this Basis Path successfully achieved structural edge coverage.";
+      resetCodeHighlighting();
+      return;
+    }
+
+    const currentNodeKey = pathConfig.nodes[animationStep];
+    const linesToHighlight = pathConfig.lines[animationStep];
+    
+    highlightCodeLines(linesToHighlight);
+    drawGraph();
+
+    statusReport.innerHTML = `Executing Node: <b>${currentNodeKey}</b> <br/> Processing associated code logical scopes.`;
+    animationStep++;
+  }, 1100);
+}
+
+document.getElementById('btnPath1').addEventListener('click', () => initPath(1));
+document.getElementById('btnPath2').addEventListener('click', () => initPath(2));
+document.getElementById('btnPath3').addEventListener('click', () => initPath(3));
+document.getElementById('btnAnimate').addEventListener('click', runSequence);
+
+// Initialize Default System state
+initPath(1);
+</script>
+</body>
+</html>

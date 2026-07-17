@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Function Point (FP) Metric Engine</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 20px 0;
+    font-size: 0.9rem;
+    color: #555555;
+  }
+  .layout-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .panel {
+    border: 2px solid #000000;
+    padding: 15px;
+    box-sizing: border-box;
+    background: #ffffff;
+    min-height: 520px;
+  }
+  .scenario-panel {
+    width: 350px;
+    background: #eeeeee;
+  }
+  .component-item {
+    padding: 6px 10px;
+    margin: 6px 0;
+    border: 1px solid #cccccc;
+    background: #ffffff;
+    font-size: 0.8rem;
+  }
+  .component-item.active-item {
+    background: #000000;
+    color: #ffffff;
+    border-color: #000000;
+    font-weight: bold;
+  }
+  .canvas-container {
+    border: 2px solid #000000;
+    background: #ffffff;
+  }
+  .calc-panel {
+    width: 440px;
+  }
+  .math-box {
+    background: #eeeeee;
+    padding: 8px 12px;
+    border-left: 4px solid #000000;
+    margin: 10px 0;
+    font-size: 0.85rem;
+  }
+  .math-box span.highlight {
+    background: #000000;
+    color: #ffffff;
+    padding: 2px 4px;
+    font-weight: bold;
+  }
+  .btn-row {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 8px 14px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  .badge {
+    display: inline-block;
+    background: #000000;
+    color: #ffffff;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    margin-top: 8px;
+  }
+  .fp-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.8rem;
+  }
+  .fp-table th, .fp-table td {
+    border: 1px solid #000000;
+    padding: 5px;
+    text-align: center;
+  }
+  .fp-table tr.active-row {
+    background: #dddddd;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Function Point (FP) Quantification & Calculation Engine</h1>
+<p class="sub">Animate the sizing procedure for an E-Commerce Order Module across the 5 standard FP transaction and data types.</p>
+
+<div class="btn-row">
+  <button id="btnStart" style="background:#000; color:#fff;">▶ Run FP Counting & Math Sequence</button>
+  <button id="btnReset">Reset Analysis</button>
+</div>
+
+<div class="layout-grid">
+  <!-- Scenario Profile Panel -->
+  <div class="panel scenario-panel">
+    <h3>Module Specifications</h3>
+    <p style="font-size:0.75rem; color:#444;">System boundaries for the targeted Order System application component:</p>
+    <hr style="border:0; border-top:1px solid #000; margin-bottom:10px;">
+    
+    <div class="component-item" id="comp_EI"><b>[EI] External Inputs</b><br/>1. Checkout Web Form<br/>2. Cancel Order Request</div>
+    <div class="component-item" id="comp_EO"><b>[EO] External Outputs</b><br/>1. Invoice PDF Generator<br/>2. Monthly Sales Dashboard</div>
+    <div class="component-item" id="comp_EQ"><b>[EQ] External Inquiries</b><br/>1. Real-time Order Status Lookup</div>
+    <div class="component-item" id="comp_ILF"><b>[ILF] Internal Logical Files</b><br/>1. Main Customer Orders Data Table</div>
+    <div class="component-item" id="comp_ELF"><b>[ELF] External Interface Files</b><br/>1. Tax Rate API Schema Directory</div>
+  </div>
+
+  <!-- Boundary Mapping Canvas -->
+  <div class="canvas-container">
+    <canvas id="fpCanvas" width="360" height="520"></canvas>
+  </div>
+
+  <!-- Mathematical Calculations Dashboard -->
+  <div class="panel calc-panel">
+    <h3>Function Point Component Matrix</h3>
+    <table class="fp-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Count</th>
+          <th>Weight (Low)</th>
+          <th>Unadjusted FPs</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr id="row_EI"><td>EI</td><td>2</td><td>× 3</td><td id="cell_EI">0</td></tr>
+        <tr id="row_EO"><td>EO</td><td>2</td><td>× 4</td><td id="cell_EO">0</td></tr>
+        <tr id="row_EQ"><td>EQ</td><td>1</td><td>× 3</td><td id="cell_EQ">0</td></tr>
+        <tr id="row_ILF"><td>ILF</td><td>1</td><td>× 7</td><td id="cell_ILF">0</td></tr>
+        <tr id="row_ELF"><td>ELF</td><td>1</td><td>× 5</td><td id="cell_ELF">0</td></tr>
+        <tr style="border-top:2px solid #000; font-weight:bold;">
+          <td colspan="3" style="text-align:right;">Total UFP:</td>
+          <td id="cell_UFP">0</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:20px;">Adjusted Calculation Pipeline</h3>
+    <div class="math-box">
+      <b>1. Unadjusted Function Points (UFP):</b><br/>
+      UFP = <span id="math_ufp_sum">0 + 0 + 0 + 0 + 0</span> = <span class="highlight" id="math_ufp_total">0</span>
+    </div>
+    
+    <div class="math-box">
+      <b>2. Value Adjustment Factor (VAF):</b><br/>
+      Scenario System Characteristics Score ($\Sigma F_i$): **24**<br/>
+      $VAF = 0.65 + (0.01 \times \Sigma F_i) = 0.65 + (0.01 \times 24) =$ <span class="highlight" id="math_vaf">0.89</span>
+    </div>
+
+    <div class="math-box">
+      <b>3. Final Adjusted Function Points:</b><br/>
+      $FP = UFP \times VAF$<br/>
+      <span id="math_final_expr">0 × 0.89</span> = <span class="highlight" style="background:#008000;" id="math_fp_total">0.00 FP</span>
+    </div>
+
+    <b>Process Monitoring Stream:</b>
+    <div id="statusReport" style="margin-top:5px; font-size:0.8rem; line-height:1.4; color:#333;">Click run to map structural system entities to the baseline equation.</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('fpCanvas');
+const ctx = canvas.getContext('2d');
+const statusReport = document.getElementById('statusReport');
+
+let currentStep = -1;
+let animTimer = null;
+
+const steps = [
+  { id: "EI", name: "External Inputs (EI)", ufp: 6, desc: "Mapping <b>External Inputs</b> (Checkout Form & Cancel Request). These cross the application boundary to update internal states. <br/>Math: 2 Inputs × Weight 3 = <b>6 UFP</b>." },
+  { id: "EO", name: "External Outputs (EO)", ufp: 8, desc: "Processing <b>External Outputs</b> (Invoice PDF & Sales Report). Data leaves the boundary incorporating calculations.<br/>Math: 2 Outputs × Weight 4 = <b>8 UFP</b>." },
+  { id: "EQ", name: "External Inquiries (EQ)", ufp: 3, desc: "Registering <b>External Inquiries</b> (Order Lookup). Instant data retrievals requiring no processing calculations.<br/>Math: 1 Inquiry × Weight 3 = <b>3 UFP</b>." },
+  { id: "ILF", name: "Internal Logical Files (ILF)", ufp: 7, desc: "Identifying <b>Internal Logical Files</b> (Orders DB Table). Main databases managed entirely within the application boundary.<br/>Math: 1 ILF × Weight 7 = <b>7 UFP</b>." },
+  { id: "ELF", name: "External Interface Files (ELF)", ufp: 5, desc: "Identifying <b>External Interface Files</b> (Tax API Directory). Reference datasets consumed but maintained externally by other software packages.<br/>Math: 1 ELF × Weight 5 = <b>5 UFP</b>." },
+  { id: "FINAL", name: "Mathematical Synthesis", ufp: 29, desc: "Compiling total baseline parameters. Applying the Value Adjustment Factor (VAF) multiplier based on complex environment processing metrics." }
+];
+
+function resetState() {
+  clearInterval(animTimer);
+  currentStep = -1;
+  document.querySelectorAll('.component-item').forEach(i => i.className = "component-item");
+  document.querySelectorAll('.fp-table tr').forEach(r => r.classList.remove('active-row'));
+  
+  // Clear numeric calculations visually
+  ["EI", "EO", "EQ", "ILF", "ELF"].forEach(t => document.getElementById(`cell_${t}`).textContent = "0");
+  document.getElementById("cell_UFP").textContent = "0";
+  document.getElementById("math_ufp_sum").textContent = "0 + 0 + 0 + 0 + 0";
+  document.getElementById("math_ufp_total").textContent = "0";
+  document.getElementById("math_final_expr").textContent = "0 × 0.89";
+  document.getElementById("math_fp_total").textContent = "0.00 FP";
+  statusReport.innerHTML = "System boundary evaluation reset. Click execution sequence to loop analysis.";
+  
+  drawBoundaryDiagram();
+}
+
+function drawBoundaryDiagram() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Application boundary outline
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(90, 80, 180, 360);
+  ctx.setLineDash([]);
+  
+  ctx.fillStyle = "#000000";
+  ctx.font = "bold 10px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("APPLICATION BOUNDARY", 180, 70);
+  ctx.fillText("(Order Module Scope)", 180, 98);
+
+  // Core internal storage structure item
+  let ilfActive = (currentStep >= 3 && currentStep !== 5);
+  ctx.strokeStyle = ilfActive ? "#000000" : "#d0d0d0";
+  ctx.fillStyle = ilfActive ? "#eeeeee" : "#ffffff";
+  ctx.lineWidth = ilfActive ? 2 : 1;
+  ctx.fillRect(110, 220, 140, 60);
+  ctx.strokeRect(110, 220, 140, 60);
+  
+  ctx.fillStyle = ilfActive ? "#000000" : "#a0a0a0";
+  ctx.fillText("[ILF Database]", 180, 245);
+  ctx.font = "8px monospace";
+  ctx.fillText("Customer Orders Table", 180, 260);
+  ctx.font = "bold 10px monospace";
+
+  // External software structure item
+  let elfActive = (currentStep >= 4 && currentStep !== 5);
+  ctx.strokeStyle = elfActive ? "#000000" : "#d0d0d0";
+  ctx.fillStyle = elfActive ? "#eeeeee" : "#ffffff";
+  ctx.lineWidth = elfActive ? 2 : 1;
+  ctx.fillRect(110, 460, 140, 40);
+  ctx.strokeRect(110, 460, 140, 40);
+  ctx.fillStyle = elfActive ? "#000000" : "#a0a0a0";
+  ctx.fillText("[ELF Reference]", 180, 485);
+
+  // Flow Arrow Vectors
+  drawFlowArrow(30, 130, 100, 130, "EI (Inputs)", currentStep === 0);
+  drawFlowArrow(260, 170, 330, 170, "EO (Outputs)", currentStep === 1);
+  drawFlowArrow(30, 340, 100, 340, "EQ (Req)", currentStep === 2);
+  drawFlowArrow(100, 360, 30, 360, "EQ (Resp)", currentStep === 2);
+  
+  // Storage interaction connector arrows
+  drawFlowArrow(180, 450, 180, 290, "Read Schema", currentStep === 4);
+}
+
+function drawFlowArrow(x1, y1, x2, y2, label, active) {
+  ctx.strokeStyle = active ? "#000000" : "#e0e0e0";
+  ctx.fillStyle = active ? "#000000" : "#b0b0b0";
+  ctx.lineWidth = active ? 2.5 : 1;
+
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  
+  let dx = x2 - x1, dy = y2 - y1;
+  let angle = Math.atan2(dy, dx);
+  ctx.beginPath(); ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 5 * Math.cos(angle - Math.PI/6), y2 - 5 * Math.sin(angle - Math.PI/6));
+  ctx.lineTo(x2 - 5 * Math.cos(angle + Math.PI/6), y2 - 5 * Math.sin(angle + Math.PI/6));
+  ctx.fill();
+
+  ctx.font = active ? "bold 9px monospace" : "9px monospace";
+  ctx.fillText(label, (x1+x2)/2, Math.min(y1,y2) - 5);
+}
+
+function playSequence() {
+  resetState();
+  currentStep = 0;
+
+  animTimer = setInterval(() => {
+    if (currentStep >= steps.length) {
+      clearInterval(animTimer);
+      return;
+    }
+
+    const info = steps[currentStep];
+    statusReport.innerHTML = `<b>Stage: ${info.name}</b><br/>${info.desc}`;
+
+    if (info.id !== "FINAL") {
+      // Highlight panel inventory item row element
+      document.getElementById(`comp_${info.id}`).className = "component-item active-item";
+      
+      // Update data processing spreadsheet structure values
+      document.getElementById(`cell_${info.id}`).textContent = info.ufp;
+      document.getElementById(`row_${info.id}`).className = "active-row";
+      
+      drawBoundaryDiagram();
+    } else {
+      // Execute global calculations pipeline compilation layout
+      document.querySelectorAll('.component-item').forEach(i => i.className = "component-item");
+      document.querySelectorAll('.fp-table tr').forEach(r => r.classList.remove('active-row'));
+      
+      document.getElementById("cell_UFP").textContent = "29";
+      document.getElementById("math_ufp_sum").textContent = "6 + 8 + 3 + 7 + 5";
+      document.getElementById("math_ufp_total").textContent = "29";
+      document.getElementById("math_final_expr").textContent = "29 × 0.89";
+      
+      // Compute value outcome equations directly
+      let finalFp = (29 * 0.89).toFixed(2);
+      document.getElementById("math_fp_total").textContent = `${finalFp} Function Points`;
+      
+      drawBoundaryDiagram();
+    }
+
+    currentStep++;
+  }, 2200);
+}
+
+document.getElementById('btnStart').addEventListener('click', playSequence);
+document.getElementById('btnReset').addEventListener('click', resetState);
+
+// Initial Static Render Configuration Load
+resetState();
+</script>
+</body>
+</html>

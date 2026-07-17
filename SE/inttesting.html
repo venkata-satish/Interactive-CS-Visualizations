@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Incremental vs Big Bang Testing Procedure Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+    color: #555555;
+  }
+  .controls-row {
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 2px solid #000000;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: #eeeeee;
+  }
+  .action-row {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 8px 16px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .workspace {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .architecture-container {
+    width: 280px;
+    background: #eeeeee;
+    padding: 15px;
+    min-height: 440px;
+    border: 2px solid #000000;
+    box-sizing: border-box;
+    font-size: 0.8rem;
+  }
+  .module-status-item {
+    padding: 8px;
+    margin: 8px 0;
+    border: 2px solid #000;
+    background: #fff;
+    font-weight: bold;
+  }
+  .module-status-item.integrated {
+    background: #000000;
+    color: #ffffff;
+  }
+  .module-status-item.stub-driver {
+    border: 2px dashed #ff0000;
+    background: #fff0f0;
+    color: #ff0000;
+  }
+  .canvas-container {
+    border: 2px solid #000000;
+    background: #ffffff;
+    display: inline-block;
+    position: relative;
+  }
+  .procedure-panel {
+    border: 2px solid #000000;
+    background: #ffffff;
+    padding: 20px;
+    width: 420px;
+    min-height: 440px;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .badge {
+    display: inline-block;
+    background: #000000;
+    color: #ffffff;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-top: 15px;
+  }
+  .step-banner {
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-bottom: 2px solid #000000;
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Integration Testing Strategy & Procedure Engine</h1>
+<p class="sub">Animate and inspect the exact execution procedures for Top-Down, Bottom-Up, and Big Bang testing paradigms.</p>
+
+<div class="controls-row">
+  <button id="btnScenA" class="active">Procedure 1: Top-Down (Incremental)</button>
+  <button id="btnScenB">Procedure 2: Bottom-Up (Incremental)</button>
+  <button id="btnScenC">Procedure 3: Big Bang (Non-Incremental)</button>
+</div>
+
+<div class="action-row">
+  <button id="btnStepForward" style="background:#f5f5f5;">Next Procedural Step ➔</button>
+  <button id="btnReset">Reset Procedure</button>
+</div>
+
+<div class="workspace">
+  <!-- Component Inventory Status Panel -->
+  <div class="architecture-container" id="archView"></div>
+
+  <!-- Graphic Structural Canvas -->
+  <div class="canvas-container">
+    <canvas id="cfgCanvas" width="380" height="440"></canvas>
+  </div>
+
+  <!-- Operational Procedure Tracker -->
+  <div class="procedure-panel" id="procedurePane">
+    <div class="step-banner">Current Phase: <span id="stepPhase">Uninitialized</span></div>
+    <h3>Execution Log & Strategy Notes</h3>
+    <div id="traceOutput">Select a testing strategy above and step forward to observe the execution lifecycle.</div>
+  </div>
+</div>
+
+<script>
+const archView = document.getElementById('archView');
+const canvas = document.getElementById('cfgCanvas');
+const ctx = canvas.getContext('2d');
+const stepPhase = document.getElementById('stepPhase');
+const traceOutput = document.getElementById('traceOutput');
+
+const btnStepForward = document.getElementById('btnStepForward');
+const btnReset = document.getElementById('btnReset');
+
+let currentMode = "A";
+let activeStep = 0;
+
+const dataset = {
+  A: {
+    name: "Top-Down Incremental Integration",
+    trace: [
+      { step: "Phase 1: Root Testing", activeNode: "M1", activeWires: [], msg: "The control procedure begins at the very top. The <b>Main Control Module (M1)</b> is isolated and verified. Because lower modules aren't integrated yet, temporary mock components called <b>Stubs</b> are inserted to simulate data replies from Sub-Modules B and C.", nodesState: { M1: 'integrated', M2: 'stub', M3: 'stub' } },
+      { step: "Phase 2: Level 2 Integration", activeNode: "M2", activeWires: ["E1"], msg: "The testing scope moves downwards. The **Stub** for <b>Sub-Module B</b> is removed, and the real code logic is linked. The interface channel between M1 and M2 is validated dynamically.", nodesState: { M1: 'integrated', M2: 'integrated', M3: 'stub' } },
+      { step: "Phase 3: Final Consolidation", activeNode: "M3", activeWires: ["E1", "E2", "E3"], msg: "The final step removes the remaining lower mock layer. <b>Sub-Module C</b> is formally bound. The internal processing loops and complete software communication links are now fully certified.", isFinal: true, nodesState: { M1: 'integrated', M2: 'integrated', M3: 'integrated' } }
+    ]
+  },
+  B: {
+    name: "Bottom-Up Incremental Integration",
+    trace: [
+      { step: "Phase 1: Leaf Verification", activeNode: "M3", activeWires: ["E3"], msg: "Operations start at the lowest structural level. **Sub-Module C (Loop Processing)** is tested individually. Since higher-level control frames do not exist yet, a temporary mock calling harness called a **Driver** is wrapped around it to supply inputs.", nodesState: { M1: 'none', M2: 'none', M3: 'integrated', driver: true } },
+      { step: "Phase 2: Utility Consolidation", activeNode: "M2", activeWires: ["E3"], msg: "The test sequence ascends. The adjacent utility component, <b>Sub-Module B</b>, is brought online and isolated using test **Drivers** to clear lower operational defects first.", nodesState: { M1: 'none', M2: 'integrated', M3: 'integrated', driver: true } },
+      { step: "Phase 3: Core Orchestration", activeNode: "M1", activeWires: ["E1", "E2", "E3"], msg: "The architecture reaches structural completion. The overarching <b>Main Control Module (M1)</b> takes control. All test drivers are retired, finalizing the integration map.", isFinal: true, nodesState: { M1: 'integrated', M2: 'integrated', M3: 'integrated' } }
+    ]
+  },
+  C: {
+    name: "Big Bang Structural Integration",
+    trace: [
+      { step: "Phase 1: Total Assembly", activeNode: "ALL", activeWires: ["E1", "E2", "E3"], msg: "<b>Non-Incremental execution pattern:</b> All components (M1, M2, and M3) are bound together simultaneously without isolation scaffolds. If a data crash happens, locating the buggy module requires tracing the entire collective framework at once.", isFinal: true, nodesState: { M1: 'integrated', M2: 'integrated', M3: 'integrated' } }
+    ]
+  }
+};
+
+const nodesLayout = {
+  M1: { label: "Main Control (M1)", x: 190, y: 70, type: "oval" },
+  M2: { label: "Sub-Module B (If-Else)", x: 90, y: 240, type: "diamond" },
+  M3: { label: "Sub-Module C (Loop)", x: 290, y: 240, type: "diamond" }
+};
+
+const wiresLayout = {
+  E1: { from: "M1", to: "M2", type: "straight", lbl: "Call" },
+  E2: { from: "M1", to: "M3", type: "straight", lbl: "Call" },
+  E3: { from: "M3", to: "M3", type: "loop", lbl: "Loop" }
+};
+
+function renderInventory(state) {
+  archView.innerHTML = `<div style="font-weight:bold; padding-bottom:10px; border-bottom:1px solid #000;">Component Status</div>`;
+  
+  Object.keys(nodesLayout).forEach(k => {
+    const item = document.createElement('div');
+    const status = state[k] || 'none';
+    item.className = `module-status-item ${status === 'integrated' ? 'integrated' : (status === 'stub' ? 'stub-driver' : '')}`;
+    
+    let stateLabel = status.toUpperCase();
+    if(status === 'none') stateLabel = "NOT READY";
+    
+    item.innerHTML = `<span>${nodesLayout[k].label}</span><br><small>Status: ${stateLabel}</small>`;
+    archView.appendChild(item);
+  });
+
+  if (state.driver) {
+    const driverItem = document.createElement('div');
+    driverItem.className = "module-status-item stub-driver";
+    driverItem.innerHTML = `<span>[Active Test Driver]</span><br><small>Status: INJECTED HARNESS</small>`;
+    archView.appendChild(driverItem);
+  }
+}
+
+function renderVisualGraph(stepData) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const states = stepData.nodesState;
+
+  // Draw architectural structural connection routes
+  Object.keys(wiresLayout).forEach(k => {
+    const w = wiresLayout[k];
+    const isWireActive = stepData.activeWires.includes(k);
+    
+    ctx.strokeStyle = isWireActive ? "#000000" : "#e0e0e0";
+    ctx.lineWidth = isWireActive ? 2.5 : 1.5;
+    ctx.fillStyle = isWireActive ? "#000000" : "#e0e0e0";
+
+    if (w.type === "straight") {
+      drawArrow(nodesLayout[w.from].x, nodesLayout[w.from].y, nodesLayout[w.to].x, nodesLayout[w.to].y, w.lbl);
+    } else if (w.type === "loop" && states.M3 === 'integrated') {
+      ctx.beginPath();
+      ctx.arc(nodesLayout[w.from].x + 40, nodesLayout[w.from].y, 20, 1.5 * Math.PI, 0.5 * Math.PI);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(nodesLayout[w.from].x + 20, nodesLayout[w.from].y + 10);
+      ctx.lineTo(nodesLayout[w.from].x + 25, nodesLayout[w.from].y + 20);
+      ctx.lineTo(nodesLayout[w.from].x + 15, nodesLayout[w.from].y + 18);
+      ctx.fill();
+    }
+  });
+
+  // Render modules
+  Object.keys(nodesLayout).forEach(k => {
+    const node = nodesLayout[k];
+    const status = states[k] || 'none';
+    const isActiveNode = (k === stepData.activeNode || stepData.activeNode === "ALL");
+
+    ctx.lineWidth = isActiveNode ? 3 : 1.5;
+    
+    if (status === 'integrated') {
+      ctx.strokeStyle = "#000000";
+      ctx.fillStyle = isActiveNode ? "#000000" : "#f5f5f5";
+    } else if (status === 'stub') {
+      ctx.strokeStyle = "#ff0000";
+      ctx.fillStyle = "#fff0f0";
+    } else {
+      ctx.strokeStyle = "#d0d0d0";
+      ctx.fillStyle = "#ffffff";
+    }
+
+    if (node.type === "oval") {
+      ctx.beginPath(); ctx.ellipse(node.x, node.y, 65, 22, 0, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(node.x, node.y - 25); ctx.lineTo(node.x + 70, node.y); ctx.lineTo(node.x, node.y + 25); ctx.lineTo(node.x - 70, node.y);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+
+    ctx.fillStyle = (isActiveNode && status === 'integrated') ? "#ffffff" : (status === 'stub' ? "#ff0000" : (status === 'none' ? '#cccccc' : '#000000'));
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(node.label, node.x, node.y + 3);
+
+    if (status === 'stub') {
+      ctx.font = "bold 8px sans-serif";
+      ctx.fillText("<<STUB>>", node.x, node.y + 14);
+    }
+  });
+
+  // Render bottom-up driving test engine context
+  if (states.driver && currentMode === "B" && activeStep < 3) {
+    ctx.strokeStyle = "#ff0000"; ctx.fillStyle = "#fff0f0"; ctx.lineWidth = 2;
+    ctx.fillRect(130, 10, 120, 25); ctx.strokeRect(130, 10, 120, 25);
+    ctx.fillStyle = "#ff0000"; ctx.font = "bold 9px monospace";
+    ctx.fillText("[ DRIVER ]", 190, 26);
+  }
+}
+
+function drawArrow(x1, y1, x2, y2, label) {
+  let dx = x2 - x1, dy = y2 - y1;
+  let angle = Math.atan2(dy, dx);
+  let startX = x1 + Math.cos(angle) * 24;
+  let startY = y1 + Math.sin(angle) * 24;
+  let endX = x2 - Math.cos(angle) * 32;
+  let endY = y2 - Math.sin(angle) * 32;
+
+  ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(endX, endY);
+  ctx.lineTo(endX - 6 * Math.cos(angle - Math.PI/6), endY - 6 * Math.sin(angle - Math.PI/6));
+  ctx.lineTo(endX - 6 * Math.cos(angle + Math.PI/6), endY - 6 * Math.sin(angle + Math.PI/6));
+  ctx.fill();
+
+  ctx.font = "9px monospace";
+  ctx.fillText(label, (startX + endX)/2 - 15, (startY + endY)/2 - 5);
+}
+
+function stepForward() {
+  const strategy = dataset[currentMode];
+  if (activeStep >= strategy.trace.length) {
+    traceOutput.innerHTML = `<h3>Deployment Complete</h3>All modules verified under the <b>${strategy.name}</b> roadmap. Ready to shift to production environment.`;
+    return;
+  }
+
+  const currentStepData = strategy.trace[activeStep];
+  
+  stepPhase.textContent = currentStepData.step;
+  renderInventory(currentStepData.nodesState);
+  renderVisualGraph(currentStepData);
+
+  traceOutput.innerHTML = `
+    <p>${currentStepData.msg}</p>
+    <span class="badge">Target Component: ${currentStepData.activeNode}</span>
+  `;
+
+  activeStep++;
+}
+
+function loadScenario(modeKey) {
+  currentMode = modeKey;
+  activeStep = 0;
+  
+  document.querySelectorAll('.controls-row button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btnScen${modeKey}`).classList.add('active');
+  
+  stepPhase.textContent = "Awaiting Step Initialization";
+  traceOutput.innerHTML = `Loaded deployment profile for <b>${dataset[modeKey].name}</b>.<br/><br/>Click 'Next Procedural Step' to cycle the engine assembly line.`;
+
+  renderInventory({M1:'none', M2:'none', M3:'none'});
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#a8a8a8"; ctx.font = "italic 10px sans-serif"; ctx.fillText("Procedure empty. Click forward to build step trace.", 50, 220);
+}
+
+btnStepForward.addEventListener('click', stepForward);
+btnReset.addEventListener('click', () => loadScenario(currentMode));
+
+document.getElementById('btnScenA').addEventListener('click', () => loadScenario('A'));
+document.getElementById('btnScenB').addEventListener('click', () => loadScenario('B'));
+document.getElementById('btnScenC').addEventListener('click', () => loadScenario('C'));
+
+// Initialize Strategy Engine
+loadScenario('A');
+</script>
+</body>
+</html>

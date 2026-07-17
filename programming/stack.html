@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Recursive Execution Stack Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+  }
+  .controls {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 2px solid #000000;
+    display: inline-flex;
+    gap: 12px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 8px 16px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  .workspace {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+  .code-container {
+    border: 2px solid #000000;
+    width: 340px;
+    background: #eeeeee;
+    padding: 10px 0;
+  }
+  .code-line {
+    padding: 3px 15px 3px 25px;
+    font-size: 0.85rem;
+    white-space: pre;
+  }
+  .code-line.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .stack-container {
+    border: 2px solid #000000;
+    width: 360px;
+    min-height: 280px;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column-reverse; /* Memory stacks grow upward graphically here */
+    padding: 10px;
+    box-sizing: border-box;
+    gap: 8px;
+  }
+  .stack-frame {
+    border: 2px solid #000000;
+    background: #ffffff;
+    padding: 8px;
+    font-size: 0.8rem;
+    animation: slideIn 0.2s ease-out;
+  }
+  .stack-frame.unwinding {
+    background: #eeeeee;
+    border-style: dashed;
+  }
+  .status-box {
+    margin-top: 25px;
+    padding: 12px;
+    border: 2px solid #000000;
+    max-width: 730px;
+    font-size: 0.85rem;
+    min-height: 50px;
+    box-sizing: border-box;
+    line-height: 1.4;
+  }
+  @keyframes slideIn {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Recursion (Factorial Stack Visualizer)</h1>
+<p class="sub">Click "Step Execution" to track how nested recursive functions pause in memory, then unwind once the base case evaluates.</p>
+
+<div class="controls">
+  <button id="btnStep">Step Execution ➔</button>
+  <button id="btnReset">Reset Trace</button>
+</div>
+
+<div class="workspace">
+  <div class="code-container">
+    <div class="code-line" id="line-0">int factorial(int n) {</div>
+    <div class="code-line" id="line-1">  if (n <= 1)</div>
+    <div class="code-line" id="line-2">    return 1;</div>
+    <div class="code-line" id="line-3">  else</div>
+    <div class="code-line" id="line-4">    return n * factorial(n - 1);</div>
+    <div class="code-line" id="line-5">}</div>
+  </div>
+
+  <div class="stack-container" id="stackContainer">
+    </div>
+</div>
+
+<div class="status-box" id="statusBox">
+  Click "Step Execution" to witness the recursive execution stack allocation of <tt>factorial(3)</tt>.
+</div>
+
+<script>
+const stackContainer = document.getElementById('stackContainer');
+const statusBox = document.getElementById('statusBox');
+const btnStep = document.getElementById('btnStep');
+const btnReset = document.getElementById('btnReset');
+
+let step = 0;
+
+// Chronological lifecycle mapping of computing factorial(3)
+const executionSteps = [
+  { line: 0, status: "Calling <tt>factorial(3)</tt>. Initial function invocation creates a frame on the call stack.", action: "push", frameId: "f3", val: "n = 3", text: "factorial(3)" },
+  { line: 1, status: "Checking condition: Is <tt>3 <= 1</tt>? No. Moving into the recursive case logic block.", action: "none" },
+  { line: 4, status: "To evaluate <tt>3 * factorial(2)</tt>, execution for this frame must <b>suspend</b>. Spawning nested function context...", action: "none" },
+  
+  { line: 0, status: "Calling <tt>factorial(2)</tt>. Pushing a secondary independent scope context layer onto the stack allocation heap.", action: "push", frameId: "f2", val: "n = 2", text: "factorial(2)" },
+  { line: 1, status: "Checking condition: Is <tt>2 <= 1</tt>? No. Proceeding down to recursive step operations.", action: "none" },
+  { line: 4, status: "To evaluate <tt>2 * factorial(1)</tt>, this frame also pauses. Initiating another nested cell...", action: "none" },
+  
+  { line: 0, status: "Calling <tt>factorial(1)</tt>. Pushing the third functional frame.", action: "push", frameId: "f1", val: "n = 1", text: "factorial(1)" },
+  { line: 1, status: "Checking condition: Is <tt>1 <= 1</tt>? <b>YES!</b> Base case matched. The deep chain stops branching outward.", action: "none" },
+  { line: 2, status: "<b>Base Case Resolves:</b> <tt>factorial(1)</tt> instantly returns literal value <tt>1</tt> and pops off.", action: "pop", frameId: "f1", result: "1" },
+  
+  { line: 4, status: "<b>Stack Unwinding:</b> Control yields back to paused frame <tt>factorial(2)</tt>. It receives <tt>1</tt>, computes <tt>2 * 1 = 2</tt>, and finishes.", action: "pop", frameId: "f2", result: "2", updateId: "f3", nextText: "factorial(3) awaiting calculation: 3 * 2" },
+  { line: 4, status: "<b>Final Resolution:</b> Primary parent frame receives <tt>2</tt>, executes trailing terminal algebra <tt>3 * 2 = 6</tt>, and returns final program data.", action: "pop", frameId: "f3", result: "6" }
+];
+
+function runSimulationStep() {
+  if (step >= executionSteps.length) {
+    statusBox.innerHTML = "<b>Execution Complete:</b> Return product computed successfully. Reset simulation to re-run pipeline traces.";
+    document.querySelectorAll('.code-line').forEach(l => l.classList.remove('active'));
+    return;
+  }
+
+  // Clear previous syntax highlights
+  document.querySelectorAll('.code-line').forEach(l => l.classList.remove('active'));
+  
+  const current = executionSteps[step];
+  
+  // Apply line highlight
+  document.getElementById(`line-${current.line}`).classList.add('active');
+  statusBox.innerHTML = `[Step ${step + 1}/${executionSteps.length}] ${current.status}`;
+  
+  if (current.action === "push") {
+    const frame = document.createElement('div');
+    frame.className = 'stack-frame';
+    frame.id = current.frameId;
+    frame.innerHTML = `<strong>${current.text}</strong><br><span>Parameters: ${current.val}</span>`;
+    stackContainer.appendChild(frame);
+  } else if (current.action === "pop") {
+    const frameEl = document.getElementById(current.frameId);
+    if (frameEl) {
+      frameEl.classList.add('unwinding');
+      frameEl.innerHTML = `<strong>${frameEl.querySelector('strong').innerText} [Resolved]</strong><br>Returned: <b>${current.result}</b>`;
+      // Delayed deletion simulation for visual clarity
+      setTimeout(() => frameEl.remove(), 900);
+    }
+    if (current.updateId) {
+      const parentFrame = document.getElementById(current.updateId);
+      if (parentFrame) parentFrame.innerHTML += `<br><small style="color:#666">${current.nextText}</small>`;
+    }
+  }
+
+  step++;
+}
+
+function resetSimulation() {
+  step = 0;
+  stackContainer.innerHTML = '';
+  document.querySelectorAll('.code-line').forEach(l => l.classList.remove('active'));
+  statusBox.innerHTML = "Click \"Step Execution\" to witness the recursive execution stack allocation of <tt>factorial(3)</tt>.";
+}
+
+btnStep.addEventListener('click', runSimulationStep);
+btnReset.addEventListener('click', resetSimulation);
+</script>
+</body>
+</html>

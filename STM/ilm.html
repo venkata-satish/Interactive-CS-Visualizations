@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Information Lifecycle Management (ILM) Simulator</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 20px 0;
+    font-size: 0.9rem;
+    color: #555555;
+  }
+  .layout-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .panel {
+    border: 2px solid #000000;
+    padding: 15px;
+    box-sizing: border-box;
+    background: #ffffff;
+    min-height: 580px;
+  }
+  .controls-panel {
+    width: 280px;
+    background: #eeeeee;
+  }
+  .canvas-container {
+    border: 2px solid #000000;
+    background: #ffffff;
+  }
+  .explanation-panel {
+    width: 420px;
+  }
+  .btn-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 12px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.85rem;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .action-btn {
+    background: #ff0000;
+    color: #ffffff;
+    border-color: #ff0000;
+    text-align: center;
+    width: 100%;
+    margin-top: 25px;
+    font-size: 1rem;
+  }
+  .action-btn:hover {
+    background: #cc0000;
+  }
+  .concept-box {
+    background: #eeeeee;
+    padding: 12px;
+    border-left: 4px solid #000000;
+    margin-top: 15px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .badge {
+    display: inline-block;
+    background: #000000;
+    color: #ffffff;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  .metric-table {
+    width: 100%;
+    font-size: 0.75rem;
+    border-collapse: collapse;
+    text-align: left;
+    margin-top: 15px;
+  }
+  .metric-table th {
+    border-bottom: 2px solid #000;
+    padding-bottom: 5px;
+  }
+  .metric-table td {
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+  }
+</style>
+</head>
+<body>
+
+<h1>Information Lifecycle Management (ILM) Engine</h1>
+<p class="sub">Simulate automated policy tiering as data ages from high-value production use down to cold archival storage.</p>
+
+<div class="layout-grid">
+  <!-- Controls Panel -->
+  <div class="panel controls-panel">
+    <h3>1. Data Age Context</h3>
+    <div class="btn-stack">
+      <button id="btnTier1" class="active">Day 1-30: Production Tier</button>
+      <button id="btnTier2">Day 31-180: Operational Tier</button>
+      <button id="btnTier3">Day 181+: Compliance Archive</button>
+    </div>
+    
+    <hr style="border:0; border-top:1px solid #000; margin: 25px 0;">
+    <h3>2. Run ILM Migration Policy</h3>
+    <button id="btnMigrate" class="action-btn">⚡ Run ILM Automation</button>
+  </div>
+
+  <!-- Interactive Graphic Canvas -->
+  <div class="canvas-container">
+    <canvas id="ilmCanvas" width="500" height="560"></canvas>
+  </div>
+
+  <!-- Educational Details Panel -->
+  <div class="panel explanation-panel">
+    <h3>ILM Policy Inspector</h3>
+    <span class="badge" id="lblTitle">Day 1-30: Active Production Data</span>
+    
+    <div class="concept-box" id="lblDesc">
+      Click "Run ILM Automation" to observe how the data payload is dynamically reallocated based on cost and access metrics.
+    </div>
+
+    <h3 style="margin-top:20px;">Storage Tier Economics</h3>
+    <table class="metric-table">
+      <thead>
+        <tr>
+          <th>Storage Tier</th>
+          <th>Media Type</th>
+          <th>Relative Cost</th>
+          <th>Access Speed</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Tier 1 (Hot)</b></td>
+          <td>NVMe Flash SSD</td>
+          <td style="color:#ff0000; font-weight:bold;">$$$$ (High)</td>
+          <td>&lt; 1ms Latency</td>
+        </tr>
+        <tr>
+          <td><b>Tier 2 (Warm)</b></td>
+          <td>SAS HDD (10K RPM)</td>
+          <td style="color:#ffaa00; font-weight:bold;">$$ (Medium)</td>
+          <td>~5-10ms Latency</td>
+        </tr>
+        <tr>
+          <td><b>Tier 3 (Cold)</b></td>
+          <td>Linear Tape (LTO)</td>
+          <td style="color:#008800; font-weight:bold;">$ (Ultra-Low)</td>
+          <td>Seconds/Minutes</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('ilmCanvas');
+const ctx = canvas.getContext('2d');
+
+let currentTier = "Tier1";
+let animTick = -1;
+let animTimer = null;
+
+// Track the current visual Y positions of existing data blocks inside tiers
+let tierDataBlocks = { t1: 3, t2: 1, t3: 0 };
+
+const diagnosticProfiles = {
+  Tier1: {
+    title: "Day 1-30: Active Production (Tier 1)",
+    desc: "<b>Data Value: Critical | Access Frequency: High</b><br/><br/>Fresh client records, transactional database logs, and active website files require immediate I/O. The system hosts them on ultra-fast Flash Storage. Keeping dead or historic data here creates massive cost overheads."
+  },
+  Tier2: {
+    title: "Day 31-180: Operational History (Tier 2)",
+    desc: "<b>Data Value: Operational | Access Frequency: Medium</b><br/><br/>Data is older and rarely modified, but remains open for monthly business analytical reporting. The automated ILM software silently demotes the files onto mechanical SAS disk setups to reclaim premium solid-state sectors."
+  },
+  Tier3: {
+    title: "Day 181+: Compliance & Long-Term Archive (Tier 3)",
+    desc: "<b>Data Value: Regulatory | Access Frequency: Near Zero</b><br/><br/>Data satisfies legal or audit standards but is almost never requested by active systems. It migrates entirely out of live disk pools onto massive, unpowered magnetic tape arrays, reducing electricity, hardware wear, and cost boundaries."
+  }
+};
+
+function switchTierMode(tier) {
+  clearInterval(animTimer);
+  currentTier = tier;
+  animTick = -1;
+  
+  document.querySelectorAll('.btn-stack button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btn${tier}`).classList.add('active');
+
+  document.getElementById('lblTitle').innerText = diagnosticProfiles[tier].title;
+  document.getElementById('lblDesc').innerHTML = diagnosticProfiles[tier].desc;
+  
+  renderILM();
+}
+
+function renderILM() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 1. Draw ILM Policy Engine Block at the Top Header Region
+  ctx.fillStyle = "#eeeeee"; ctx.strokeStyle = "#000000"; ctx.lineWidth = 2;
+  ctx.fillRect(130, 15, 240, 50); ctx.strokeRect(130, 15, 240, 50);
+  ctx.fillStyle = "#000000"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+  ctx.fillText("AUTOMATED ILM POLICY ENGINE", 250, 35);
+  ctx.font = "9px monospace"; ctx.fillStyle = "#ff0000";
+  ctx.fillText("CRITERIA: Data Age & Access Velocity", 250, 52);
+
+  // 2. Render Storage Tiers Boxes Vertically
+  drawTierBox(40, 110, "TIER 1: HIGH-PERFORMANCE NVMe FLASH", "#ffdddd", tierDataBlocks.t1);
+  drawTierBox(40, 250, "TIER 2: BALANCED SAS HARD DRIVES", "#ffeebb", tierDataBlocks.t2);
+  drawTierBox(40, 390, "TIER 3: COLD COMPLIANCE TAPE ARRAY", "#ddffdd", tierDataBlocks.t3);
+
+  // 3. Draw Migration Pipelines Connector Indicators
+  drawArrowLine(250, 65, 250, 110);
+  drawArrowLine(250, 220, 250, 250);
+  drawArrowLine(250, 360, 250, 390);
+
+  // 4. Animate Moving Data Blocks Along Paths
+  if (animTick >= 0) {
+    let progress = animTick / 40;
+    
+    if (currentTier === "Tier1" && animTick <= 40) {
+      // Ingress path into tier 1 box layout structures
+      let yPos = 65 + (45 * progress);
+      drawBlockPacket(250, yPos, "NEW DATA", "#ff0000");
+    } 
+    else if (currentTier === "Tier2" && animTick <= 40) {
+      // Shifting downward movement from Tier 1 to Tier 2
+      let yPos = 220 + (30 * progress);
+      drawBlockPacket(250, yPos, "MIGRATING WARM", "#ffaa00");
+    } 
+    else if (currentTier === "Tier3" && animTick <= 40) {
+      // Shifting downward movement from Tier 2 to Tier 3
+      let yPos = 360 + (30 * progress);
+      drawBlockPacket(250, yPos, "ARCHIVING COLD", "#008800");
+    }
+  }
+}
+
+function drawTierBox(x, y, label, bgColor, blockCount) {
+  ctx.fillStyle = bgColor; ctx.strokeStyle = "#000000"; ctx.lineWidth = 2;
+  ctx.fillRect(x, y, 420, 110); ctx.strokeRect(x, y, 420, 110);
+  
+  ctx.fillStyle = "#000000"; ctx.font = "bold 10px monospace"; ctx.textAlign = "left";
+  ctx.fillText(label, x + 12, y + 20);
+
+  // Draw simulated hardware components inside the boundary layers
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.strokeRect(x + 12, y + 32, 396, 65);
+
+  // Draw static localized blocks indicating standard filling capacity limits
+  for (let i = 0; i < blockCount; i++) {
+    let bx = x + 25 + (i * 75);
+    let by = y + 45;
+    ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#000000"; ctx.lineWidth = 1.5;
+    ctx.fillRect(bx, by, 60, 40); ctx.strokeRect(bx, by, 60, 40);
+    ctx.fillStyle = "#555555"; ctx.font = "8px monospace"; ctx.textAlign = "center";
+    ctx.fillText("DATA BLOCK", bx + 30, by + 24);
+  }
+}
+
+function drawBlockPacket(x, y, label, color) {
+  ctx.fillStyle = color; ctx.fillRect(x - 55, y - 15, 110, 30);
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 2; ctx.strokeRect(x - 55, y - 15, 110, 30);
+  ctx.fillStyle = "#ffffff"; ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
+  ctx.fillText(label, x, y + 4);
+}
+
+function drawArrowLine(x1, y1, x2, y2) {
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  
+  // Arrow Point Head
+  ctx.fillStyle = "#000000";
+  ctx.beginPath();
+  ctx.moveTo(x2 - 4, y2 - 6);
+  ctx.lineTo(x2 + 4, y2 - 6);
+  ctx.lineTo(x2, y2);
+  ctx.fill();
+}
+
+function executeILMPolicyEngine() {
+  clearInterval(animTimer);
+  animTick = 0;
+
+  // Temporarily reduce local count profiles to match graphic transition flows
+  if (currentTier === "Tier2" && tierDataBlocks.t1 > 0) tierDataBlocks.t1--;
+  if (currentTier === "Tier3" && tierDataBlocks.t2 > 0) tierDataBlocks.t2--;
+
+  animTimer = setInterval(() => {
+    animTick++;
+    renderILM();
+    
+    if (animTick >= 40) {
+      clearInterval(animTimer);
+      animTick = -1;
+      
+      // Permanently increment target destination counts once loop frames complete
+      if (currentTier === "Tier1" && tierDataBlocks.t1 < 5) tierDataBlocks.t1++;
+      if (currentTier === "Tier2" && tierDataBlocks.t2 < 5) tierDataBlocks.t2++;
+      if (currentTier === "Tier3" && tierDataBlocks.t3 < 5) tierDataBlocks.t3++;
+      
+      renderILM();
+    }
+  }, 25);
+}
+
+document.getElementById('btnTier1').addEventListener('click', () => switchTierMode("Tier1"));
+document.getElementById('btnTier2').addEventListener('click', () => switchTierMode("Tier2"));
+document.getElementById('btnTier3').addEventListener('click', () => switchTierMode("Tier3"));
+document.getElementById('btnMigrate').addEventListener('click', executeILMPolicyEngine);
+
+// Initialize Default Simulator Configuration View Profile
+switchTierMode("Tier1");
+</script>
+</body>
+</html>

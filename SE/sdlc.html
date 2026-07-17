@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Interactive SDLC Phases Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+  }
+  .controls {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 2px solid #000000;
+    display: inline-flex;
+    gap: 12px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 8px 16px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  .workspace {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  
+  /* Circular Ring Track Visualizer Container */
+  .lifecycle-ring {
+    border: 2px solid #000000;
+    background: #ffffff;
+    width: 440px;
+    height: 440px;
+    position: relative;
+    border-radius: 50%;
+  }
+  .phase-node {
+    position: absolute;
+    border: 2px solid #000000;
+    background: #ffffff;
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    transform: translate(-50%, -50%);
+    width: 140px;
+    text-align: center;
+    box-sizing: border-box;
+    transition: all 0.25s ease;
+  }
+  .phase-node.active {
+    background: #000000;
+    color: #ffffff;
+    scale: 1.05;
+  }
+  .phase-node.passed {
+    background: #eeeeee;
+  }
+  
+  .report-box {
+    border: 2px solid #000000;
+    background: #eeeeee;
+    padding: 15px;
+    width: 360px;
+    min-height: 440px;
+    box-sizing: border-box;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .artifact-tag {
+    display: inline-block;
+    border: 1px solid #000000;
+    background: #ffffff;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    margin-top: 10px;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>The SDLC Framework Sandbox</h1>
+<p class="sub">Step sequentially through the 7 core engineering phases to witness how system requirements transform into production operations.</p>
+
+<div class="controls">
+  <button id="btnNext">Advance SDLC Step ➔</button>
+  <button id="btnReset">Reset Track</button>
+</div>
+
+<div class="workspace">
+  <div class="lifecycle-ring" id="ringContainer">
+    <div class="phase-node" id="n0">1. Planning & Analysis</div>
+    <div class="phase-node" id="n1">2. Defining Specs</div>
+    <div class="phase-node" id="n2">3. Architecture Design</div>
+    <div class="phase-node" id="n3">4. Implementation</div>
+    <div class="phase-node" id="n4">5. QA & Testing</div>
+    <div class="phase-node" id="n5">6. Deployment</div>
+    <div class="phase-node" id="n6">7. Maintenance</div>
+  </div>
+
+  <div class="report-box" id="reportPane">
+    <h3>SDLC Status Console</h3>
+    <div id="reportContent">Click "Advance SDLC Step" to initialize the software engineering pipeline.</div>
+  </div>
+</div>
+
+<script>
+const reportContent = document.getElementById('reportContent');
+const btnNext = document.getElementById('btnNext');
+const btnReset = document.getElementById('btnReset');
+
+let currentStep = 0;
+
+// Coordinate layout distributions mapping nodes in circular track configurations
+const nodePositions = [
+  { x: 220, y: 40 },  // Phase 1: Top
+  { x: 360, y: 110 }, // Phase 2: Top Right
+  { x: 400, y: 260 }, // Phase 3: Bottom Right
+  { x: 290, y: 390 }, // Phase 4: Bottom Center-Right
+  { x: 150, y: 390 }, // Phase 5: Bottom Center-Left
+  { x: 40, y: 260 },  // Phase 6: Bottom Left
+  { x: 80, y: 110 }   // Phase 7: Top Left
+];
+
+const lifecycleMeta = [
+  {
+    msg: "<b>Planning & Requirement Analysis:</b> Senior stakeholders map out business goals, financial funding scope limits, and structural feasibility metrics.",
+    tag: "Artifact: Feasibility Analysis Brief"
+  },
+  {
+    msg: "<b>Defining Requirements:</b> Structural parameters are converted directly into detailed operational definitions, frozen inside a master specification agreement.",
+    tag: "Artifact: Software Requirements Specification (SRS)"
+  },
+  {
+    msg: "<b>System Design Architecture:</b> Systems engineers map architectural layers. Includes layout structures for data storage schemas, microservices network maps, and hardware routing.",
+    tag: "Artifact: Design Document Specification (DDS)"
+  },
+  {
+    msg: "<b>Implementation (Coding):</b> The application code is built out line-by-line. Coders implement programming logic directly inside boundaries established by the DDS specifications.",
+    tag: "Output: Raw Executable Code Build"
+  },
+  {
+    msg: "<b>Testing & QA:</b> The application build undergoes integration tests, system sanity sweeps, and strict regression tracing to isolate structural coding defects.",
+    tag: "Target: Zero Critical Open Bugs"
+  },
+  {
+    msg: "<b>Product Deployment:</b> The stable code application passes evaluation checks. Automated pipelines mirror the tested code image cleanly out to live consumer servers.",
+    tag: "Status: Live In Production"
+  },
+  {
+    msg: "<b>Operations & Maintenance:</b> Long-term surveillance mode. SRE monitors watch cluster workloads while developers push security patches and minor performance fixes.",
+    tag: "Continuous Loop: Triggers new requirements"
+  }
+];
+
+function initPositions() {
+  for (let i = 0; i < 7; i++) {
+    const node = document.getElementById(`n${i}`);
+    node.style.left = `${nodePositions[i].x}px`;
+    node.style.top = `${nodePositions[i].y}px`;
+  }
+}
+
+function advanceLifecycle() {
+  if (currentStep >= 7) {
+    reportContent.innerHTML = "<h3>Lifecycle Complete</h3>The production deployment loop has run a full sequence. Click Reset to recycle the engine framework.";
+    return;
+  }
+  
+  // Reset visual state highlights
+  document.querySelectorAll('.phase-node').forEach(n => n.className = 'phase-node');
+  
+  // Color code past history milestones
+  for (let i = 0; i < currentStep; i++) {
+    document.getElementById(`n${i}`).classList.add('passed');
+  }
+  
+  const currentNode = document.getElementById(`n${currentStep}`);
+  currentNode.classList.add('active');
+  
+  reportContent.innerHTML = `
+    <h3>Active Phase: ${currentNode.innerText}</h3>
+    <p>${lifecycleMeta[currentStep].msg}</p>
+    <div class="artifact-tag">${lifecycleMeta[currentStep].tag}</div>
+  `;
+  
+  currentStep++;
+}
+
+function resetLifecycle() {
+  currentStep = 0;
+  document.querySelectorAll('.phase-node').forEach(n => n.className = 'phase-node');
+  reportContent.innerHTML = "Click \"Advance SDLC Step\" to initialize the software engineering pipeline.";
+}
+
+btnNext.addEventListener('click', advanceLifecycle);
+btnReset.addEventListener('click', resetLifecycle);
+
+// Position nodes around the ring track at start
+initPositions();
+</script>
+</body>
+</html>

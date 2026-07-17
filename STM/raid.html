@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Advanced RAID Slicing & Data Fragmentation Engine</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 20px 0;
+    font-size: 0.9rem;
+    color: #555555;
+  }
+  .layout-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .panel {
+    border: 2px solid #000000;
+    padding: 15px;
+    box-sizing: border-box;
+    background: #ffffff;
+    min-height: 560px;
+  }
+  .controls-panel {
+    width: 300px;
+    background: #eeeeee;
+  }
+  .canvas-container {
+    border: 2px solid #000000;
+    background: #ffffff;
+  }
+  .explanation-panel {
+    width: 400px;
+  }
+  .btn-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 12px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: left;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .action-btn {
+    background: #ff0000;
+    color: #ffffff;
+    border-color: #ff0000;
+    text-align: center;
+    width: 100%;
+    margin-top: 20px;
+    font-size: 1rem;
+  }
+  .action-btn:hover {
+    background: #cc0000;
+  }
+  .concept-box {
+    background: #eeeeee;
+    padding: 12px;
+    border-left: 4px solid #000000;
+    margin-top: 15px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  .badge {
+    display: inline-block;
+    background: #000000;
+    color: #ffffff;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Advanced RAID Slicing & Fragmentation Engine</h1>
+<p class="sub">Observe how a single continuous payload ("DATA") is physically pulled apart, sliced into chunks, and routed down distinct network lanes.</p>
+
+<div class="layout-grid">
+  <!-- Interactive Controller Block -->
+  <div class="panel controls-panel">
+    <h3>1. Select RAID Engine</h3>
+    <div class="btn-stack">
+      <button id="btnRaid0" class="active">RAID 0 (Data Striping)</button>
+      <button id="btnRaid1">RAID 1 (Data Mirroring)</button>
+      <button id="btnRaid5">RAID 5 (Distributed Parity)</button>
+    </div>
+    
+    <hr style="border:0; border-top:1px solid #000; margin: 30px 0;">
+    <h3>2. Run Slicing Logic</h3>
+    <button id="btnSlice" class="action-btn">⚡ Slice & Stream Data</button>
+  </div>
+
+  <!-- Interactive Graphic Canvas -->
+  <div class="canvas-container">
+    <canvas id="raidCanvas" width="480" height="540"></canvas>
+  </div>
+
+  <!-- Educational Explanations -->
+  <div class="panel explanation-panel">
+    <h3>Data Architecture Trace Log</h3>
+    <span class="badge" id="lblTitle">RAID 0 (Data Striping)</span>
+    
+    <div class="concept-box" id="lblDesc">
+      Click the button to split the word "DATA" using your chosen RAID layout logic.
+    </div>
+
+    <h3 style="margin-top:25px;">Slicing Rules Matrix</h3>
+    <table style="width:100%; font-size:0.8rem; border-collapse: collapse; text-align:left;">
+      <tr style="border-bottom:1px solid #000;"><th style="padding:5px;">Type</th><th style="padding:5px;">Slicing Action Taken</th></tr>
+      <tr style="border-bottom:1px solid #eee;"><td style="padding:5px; font-weight:bold;">RAID 0</td><td style="padding:5px;">Splits "DATA" ➔ D, A, T, A. Distributed sequentially to double the speed.</td></tr>
+      <tr style="border-bottom:1px solid #eee;"><td style="padding:5px; font-weight:bold;">RAID 1</td><td style="padding:5px;">Copies "DATA" ➔ Sends whole clones to both disks at once.</td></tr>
+      <tr style="border-bottom:1px solid #eee;"><td style="padding:5px; font-weight:bold;">RAID 5</td><td style="padding:5px;">Splits text chunks and inserts a dynamic math parity bit block [P].</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('raidCanvas');
+const ctx = canvas.getContext('2d');
+
+let currentRaid = "RAID0";
+let animTick = -1;
+let animTimer = null;
+
+// Track what successfully saved into disk blocks
+let diskStorage = {
+  disk1: [],
+  disk2: [],
+  disk3: []
+};
+
+const profiles = {
+  RAID0: {
+    title: "RAID 0 (Sequential Data Striping)",
+    desc: "<b>Slicing Mechanism:</b> The incoming file block <b>\"DATA\"</b> hits the controller card. The controller breaks the string into individual pieces. <b>'D'</b> and <b>'T'</b> are sent to lane 1. <b>'A'</b> and <b>'A'</b> are sent to lane 2. Notice how the letters stagger back and forth between the two disks!"
+  },
+  RAID1: {
+    title: "RAID 1 (Simultaneous Data Mirroring)",
+    desc: "<b>Slicing Mechanism:</b> The string <b>\"DATA\"</b> is not divided! The controller copies the payload into two matching data tracks. The entire word <b>\"DATA\"</b> moves down Lane 1, while an identical copy moves down Lane 2 at the exact same time."
+  },
+  RAID5: {
+    title: "RAID 5 (Data Striping + Interleaved Parity)",
+    desc: "<b>Slicing Mechanism:</b> The controller handles data across 3 separate disks. It stripes data characters (`D`, `A`, `T`, `A`) across two disks, while calculating an XOR parity block (`P`) to store on the third disk. The parity block alternates drives on every layer."
+  }
+};
+
+function setRaid(mode) {
+  clearInterval(animTimer);
+  currentRaid = mode;
+  animTick = -1;
+  resetDiskBuffers();
+  
+  document.querySelectorAll('.btn-stack button').forEach(b => b.classList.remove('active'));
+  if (mode === "RAID0") document.getElementById('btnRaid0').classList.add('active');
+  if (mode === "RAID1") document.getElementById('btnRaid1').classList.add('active');
+  if (mode === "RAID5") document.getElementById('btnRaid5').classList.add('active');
+
+  document.getElementById('lblTitle').innerText = profiles[mode].title;
+  document.getElementById('lblDesc').innerHTML = profiles[mode].desc;
+  
+  drawLayout();
+}
+
+function resetDiskBuffers() {
+  diskStorage.disk1 = ["", "", "", ""];
+  diskStorage.disk2 = ["", "", "", ""];
+  diskStorage.disk3 = ["", "", "", ""];
+}
+
+function drawLayout() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // 1. Render Host Source Node
+  ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#000000"; ctx.lineWidth = 2;
+  ctx.fillRect(165, 20, 150, 45); ctx.strokeRect(165, 20, 150, 45);
+  ctx.fillStyle = "#000000"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+  ctx.fillText("HOST MEMORY BUFFER", 240, 38);
+  
+  // Display original unsliced data inside source box when animation hasn't started
+  if (animTick === -1) {
+    ctx.fillStyle = "#ff0000"; ctx.font = "bold 14px monospace";
+    ctx.fillText("[ D A T A ]", 240, 58);
+  }
+
+  // 2. The Smart Controller Array Processor
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(180, 110, 120, 40);
+  ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px monospace";
+  ctx.fillText("RAID CONTROLLER", 240, 128);
+  ctx.font = "8px monospace";
+  ctx.fillText("SLICING LOGIC ENGAGED", 240, 142);
+  
+  // Flow wire from host to controller
+  drawWire(240, 65, 240, 110);
+
+  // 3. Render dynamic target disk structures depending on RAID profile rules
+  if (currentRaid === "RAID0" || currentRaid === "RAID1") {
+    // 2-Disk configuration setups
+    drawDiskBox(80, 340, "DISK 1 (Lane 1)", diskStorage.disk1);
+    drawDiskBox(300, 340, "DISK 2 (Lane 2)", diskStorage.disk2);
+    
+    drawWire(190, 150, 130, 340);
+    drawWire(290, 150, 350, 340);
+  } else {
+    // 3-Disk configurations setups for parity distributions
+    drawDiskBox(30, 340, "DISK 1", diskStorage.disk1);
+    drawDiskBox(180, 340, "DISK 2", diskStorage.disk2);
+    drawDiskBox(330, 340, "DISK 3", diskStorage.disk3);
+    
+    drawWire(190, 150, 75, 340);
+    drawWire(240, 150, 225, 340);
+    drawWire(290, 150, 375, 340);
+  }
+
+  // Process and draw the custom individual text slicing animation tracks
+  processSlicingAnimation();
+}
+
+function drawDiskBox(x, y, label, storageArray) {
+  ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#000000"; ctx.lineWidth = 2;
+  ctx.fillRect(x, y, 90, 160); ctx.strokeRect(x, y, 90, 160);
+  
+  ctx.fillStyle = "#000000"; ctx.font = "bold 9px monospace";
+  ctx.fillText(label, x + 45, y + 18);
+  
+  // Render internal block layers for storage visualization
+  for (let r = 0; r < 4; r++) {
+    let rx = x + 8;
+    let ry = y + 30 + (r * 30);
+    ctx.strokeStyle = "#cccccc"; ctx.strokeRect(rx, ry, 74, 25);
+    
+    if (storageArray[r]) {
+      let dataVal = storageArray[r];
+      ctx.fillStyle = dataVal.includes("[P]") ? "#0000ff" : "#ff0000";
+      ctx.fillRect(rx+1, ry+1, 72, 23);
+      
+      ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px monospace";
+      ctx.fillText(dataVal, rx + 37, ry + 16);
+    }
+  }
+}
+
+function drawWire(x1, y1, x2, y2) {
+  ctx.strokeStyle = "#dddddd"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+}
+
+function processSlicingAnimation() {
+  if (animTick < 0) return;
+
+  // Global progress calculation across frames
+  let progress = (animTick % 40) / 40;
+  
+  if (currentRaid === "RAID0") {
+    // Slices text characters sequentially back and forth down matching lane pathways
+    if (animTick < 40) {
+      // First split: Letter 'D' leaves Lane 1, Letter 'A' leaves Lane 2
+      let dX = 190 - (60 * progress); let dY = 150 + (190 * progress);
+      let aX = 290 + (60 * progress); let aY = 150 + (190 * progress);
+      
+      drawChunkPacket(dX, dY, "Chunk 1: 'D'", "#ff0000");
+      drawChunkPacket(aX, aY, "Chunk 2: 'A'", "#ff0000");
+    } else {
+      // Second split: Letter 'T' leaves Lane 1, Letter 'A' leaves Lane 2
+      let tX = 190 - (60 * progress); let tY = 150 + (190 * progress);
+      let a2X = 290 + (60 * progress); let a2Y = 150 + (190 * progress);
+      
+      drawChunkPacket(tX, tY, "Chunk 3: 'T'", "#ff0000");
+      drawChunkPacket(a2X, a2Y, "Chunk 4: 'A'", "#ff0000");
+    }
+  } 
+  
+  else if (currentRaid === "RAID1") {
+    // Clones the complete data packet to keep paths perfectly mirrored
+    let p1X = 190 - (60 * progress); let p1Y = 150 + (190 * progress);
+    let p2X = 290 + (60 * progress); let p2Y = 150 + (190 * progress);
+    
+    drawChunkPacket(p1X, p1Y, "DATA (Master)", "#ff0000");
+    drawChunkPacket(p2X, p2Y, "DATA (Mirror)", "#ffaa00");
+  } 
+  
+  else if (currentRaid === "RAID5") {
+    // Distributes individual text chunks alongside calculated parity blocks [P] across 3 drives
+    if (animTick < 40) {
+      let x1 = 190 - (115 * progress); let y1 = 150 + (190 * progress);
+      let x2 = 240 - (15 * progress);  let y2 = 150 + (190 * progress);
+      let x3 = 290 + (85 * progress);  let y3 = 150 + (190 * progress);
+
+      drawChunkPacket(x1, y1, "'D'", "#ff0000");
+      drawChunkPacket(x2, y2, "'A'", "#ff0000");
+      drawChunkPacket(x3, y3, "XOR [P1]", "#0000ff");
+    } else {
+      let x1 = 190 - (115 * progress); let y1 = 150 + (190 * progress);
+      let x2 = 240 - (15 * progress);  let y2 = 150 + (190 * progress);
+      let x3 = 290 + (85 * progress);  let y3 = 150 + (190 * progress);
+
+      drawChunkPacket(x1, y1, "XOR [P2]", "#0000ff");
+      drawChunkPacket(x2, y2, "'T'", "#ff0000");
+      drawChunkPacket(x3, y3, "'A'", "#ff0000");
+    }
+  }
+}
+
+function drawChunkPacket(x, y, txt, col) {
+  ctx.fillStyle = col;
+  ctx.fillRect(x - 30, y - 10, 60, 20);
+  ctx.strokeStyle = "#000000"; ctx.strokeRect(x - 30, y - 10, 60, 20);
+  
+  ctx.fillStyle = "#ffffff"; ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
+  ctx.fillText(txt, x, y + 3);
+}
+
+function triggerSlicingPipeline() {
+  clearInterval(animTimer);
+  animTick = 0;
+  resetDiskBuffers();
+  
+  let maxTicks = currentRaid === "RAID1" ? 40 : 80;
+
+  animTimer = setInterval(() => {
+    animTick++;
+    
+    // Check points to inject sliced values into disk storage layers dynamically
+    if (currentRaid === "RAID0") {
+      if (animTick === 39) { diskStorage.disk1[0] = "D"; diskStorage.disk2[0] = "A"; }
+      if (animTick === 79) { diskStorage.disk1[1] = "T"; diskStorage.disk2[1] = "A"; }
+    } 
+    else if (currentRaid === "RAID1") {
+      if (animTick === 39) { diskStorage.disk1[0] = "DATA"; diskStorage.disk2[0] = "DATA"; }
+    } 
+    else if (currentRaid === "RAID5") {
+      if (animTick === 39) { diskStorage.disk1[0] = "D"; diskStorage.disk2[0] = "A"; diskStorage.disk3[0] = "[P1]"; }
+      if (animTick === 79) { diskStorage.disk1[1] = "[P2]"; diskStorage.disk2[1] = "T"; diskStorage.disk3[1] = "A"; }
+    }
+
+    drawLayout();
+
+    if (animTick >= maxTicks) {
+      clearInterval(animTimer);
+      animTick = -1;
+    }
+  }, 45);
+}
+
+document.getElementById('btnRaid0').addEventListener('click', () => setRaid("RAID0"));
+document.getElementById('btnRaid1').addEventListener('click', () => setRaid("RAID1"));
+document.getElementById('btnRaid5').addEventListener('click', () => setRaid("RAID5"));
+document.getElementById('btnSlice').addEventListener('click', triggerSlicingPipeline);
+
+// Initial Engine Setup Load configurations
+setRaid("RAID0");
+</script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>C++ Compilation Pipeline Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+  }
+  .pipeline-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-width: 900px;
+  }
+  .stage-card {
+    border: 2px solid #000000;
+    padding: 12px;
+    display: flex;
+    gap: 20px;
+    align-items: stretch;
+    background: #ffffff;
+    position: relative;
+  }
+  .stage-card.inactive {
+    opacity: 0.4;
+    background: #fafafa;
+  }
+  .stage-info {
+    width: 200px;
+    flex-shrink: 0;
+    border-right: 2px dashed #000000;
+    padding-right: 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .stage-num {
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #666666;
+  }
+  .stage-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin: 4px 0;
+  }
+  .stage-arrow {
+    font-size: 0.75rem;
+    color: #444444;
+    margin-top: 5px;
+  }
+  .code-pane {
+    flex-grow: 1;
+    background: #eeeeee;
+    padding: 10px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    border: 1px solid #cccccc;
+    display: flex;
+    align-items: center;
+  }
+  .controls {
+    margin-bottom: 25px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 8px 18px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    text-decoration: line-through;
+  }
+  .status-box {
+    border: 2px solid #000000;
+    padding: 12px;
+    margin-bottom: 20px;
+    max-width: 900px;
+    font-size: 0.9rem;
+    min-height: 40px;
+    box-sizing: border-box;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<h1>C++ Compilation Pipeline Visualizer</h1>
+<p class="sub">Step through the toolchain sequence to see how abstract human-written code collapses step-by-step into a machine binary file layout.</p>
+
+<div class="controls">
+  <button id="btnNext">Advance Toolchain Stage</button>
+  <button id="btnReset" style="margin-left: 10px;">Reset Pipeline</button>
+</div>
+
+<div class="status-box" id="statusBox">
+  Click "Advance Toolchain Stage" to feed the source file code into the compiler system pipeline infrastructure.
+</div>
+
+<div class="pipeline-container">
+  <div class="stage-card" id="card0">
+    <div class="stage-info">
+      <div class="stage-num">Source Entry</div>
+      <div class="stage-title">main.cpp</div>
+      <div class="stage-arrow">INPUT FILE 📄</div>
+    </div>
+    <div class="code-pane" id="pane0">#define MULTIPLIER 2
+// Double the input value
+int main() {
+    int val = 5;
+    return val * MULTIPLIER;
+}</div>
+  </div>
+
+  <div class="stage-card inactive" id="card1">
+    <div class="stage-info">
+      <div class="stage-num">Stage 1</div>
+      <div class="stage-title">Preprocessor</div>
+      <div class="stage-arrow">OUTPUT: main.i ⚙️</div>
+    </div>
+    <div class="code-pane" id="pane1">... awaiting input file transmission ...</div>
+  </div>
+
+  <div class="stage-card inactive" id="card2">
+    <div class="stage-info">
+      <div class="stage-num">Stage 2</div>
+      <div class="stage-title">Compiler</div>
+      <div class="stage-arrow">OUTPUT: main.s 💻</div>
+    </div>
+    <div class="code-pane" id="pane2">... awaiting preprocessed stream ...</div>
+  </div>
+
+  <div class="stage-card inactive" id="card3">
+    <div class="stage-info">
+      <div class="stage-num">Stage 3</div>
+      <div class="stage-title">Assembler</div>
+      <div class="stage-arrow">OUTPUT: main.obj 📦</div>
+    </div>
+    <div class="code-pane" id="pane3">... awaiting assembly generation ...</div>
+  </div>
+
+  <div class="stage-card inactive" id="card4">
+    <div class="stage-info">
+      <div class="stage-num">Stage 4</div>
+      <div class="stage-title">Linker</div>
+      <div class="stage-arrow">OUTPUT: main.exe 🚀</div>
+    </div>
+    <div class="code-pane" id="pane4">... awaiting final translation units binding ...</div>
+  </div>
+</div>
+
+<script>
+let currentStage = 0;
+
+const stageData = [
+  {
+    msg: "<b>Initial State:</b> The raw source file <tt>main.cpp</tt> contains high-level code, explicit comments, and preprocessor directives (`#define`).",
+    code: ""
+  },
+  {
+    msg: "<b>1. Preprocessor Running:</b> All comments are completely stripped out. The macro token text <tt>MULTIPLIER</tt> has been searched and replaced with its raw text value <tt>2</tt>.",
+    code: "int main() {\n    int val = 5;\n    return val * 2;\n}"
+  },
+  {
+    msg: "<b>2. Compiler Running:</b> High-level C++ statements are parsed and refactored into human-readable target architecture <b>Assembly Language instructions</b>.",
+    code: "main:\n    push    rbp\n    mov     rbp, rsp\n    mov     DWORD PTR [rbp-4], 5\n    mov     eax, DWORD PTR [rbp-4]\n    add     eax, eax\n    pop     rbp\n    ret"
+  },
+  {
+    msg: "<b>3. Assembler Running:</b> Text assembly commands convert into raw binary machine codes. This creates an <b>Object File (.obj / .o)</b> holding compiled hex payloads.",
+    code: "0000000000000000 <main>:\n   0:  55                    push   rbp\n   1:  48 89 e5              mov    rbp,rsp\n   4:  c7 45 fc 05 00 00 00  mov    DWORD PTR [rbp-0x4],0x5\n   b:  8b 45 fc              mov    eax,DWORD PTR [rbp-0x4]\n   e:  01 c0                 add    eax,eax\n  10:  5d                    pop    rbp\n  11:  c3                    ret"
+  },
+  {
+    msg: "<b>4. Linker Running (Complete):</b> The linker imports runtime initialization codes, resolves addresses, patches library links, and exports the final complete **Executable File (.exe)** block layout.",
+    code: "[ MZ Executable Header Header Signature ]\n[ PE Directory Target Hardware Section Map ]\n[ Runtime Call Stubs Entry Point: 0x00401000 ]\n00401000:  55 48 89 e5 c7 45 fc 05 00 00 00 8b 45 fc 01 c0 5d c3 ...\n[ System Symbols & Data Blocks Cleared Out ]\n\n=== PIPELINE SUCCESS: EXECUTABLE CREATED ==="
+  }
+];
+
+const btnNext = document.getElementById('btnNext');
+const btnReset = document.getElementById('btnReset');
+const statusBox = document.getElementById('statusBox');
+
+function advanceStage() {
+  if (currentStage >= 4) return;
+  
+  currentStage++;
+  
+  // Highlight and modify the status visual configurations
+  const card = document.getElementById(`card${currentStage}`);
+  const pane = document.getElementById(`pane${currentStage}`);
+  
+  card.classList.remove('inactive');
+  card.style.borderWidth = '3px';
+  pane.textContent = stageData[currentStage].code;
+  statusBox.innerHTML = stageData[currentStage].msg;
+  
+  // Clean last active highlighting frame markers
+  if (currentStage > 1) {
+    document.getElementById(`card${currentStage-1}`).style.borderWidth = '2px';
+  }
+  
+  if (currentStage === 4) {
+    btnNext.disabled = true;
+  }
+}
+
+function resetPipeline() {
+  currentStage = 0;
+  btnNext.disabled = false;
+  statusBox.innerHTML = stageData[0].msg;
+  
+  for (let i = 1; i <= 4; i++) {
+    const card = document.getElementById(`card${i}`);
+    const pane = document.getElementById(`pane${i}`);
+    card.classList.add('inactive');
+    card.style.borderWidth = '2px';
+    
+    if (i === 1) pane.textContent = "... awaiting input file transmission ...";
+    if (i === 2) pane.textContent = "... awaiting preprocessed stream ...";
+    if (i === 3) pane.textContent = "... awaiting assembly generation ...";
+    if (i === 4) pane.textContent = "... awaiting final translation units binding ...";
+  }
+}
+
+btnNext.addEventListener('click', advanceStage);
+btnReset.addEventListener('click', resetPipeline);
+
+// Run initial status update check pass
+statusBox.innerHTML = stageData[0].msg;
+</script>
+
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Controlled Sequence Diagram Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+  }
+  .controls-row {
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 2px solid #000000;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: #eeeeee;
+  }
+  .action-row {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 8px 16px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  button:disabled {
+    border-color: #cccccc;
+    color: #cccccc;
+    cursor: not-allowed;
+  }
+  .workspace {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .canvas-container {
+    border: 2px solid #000000;
+    background: #ffffff;
+    display: inline-block;
+  }
+  .report-box {
+    border: 2px solid #000000;
+    background: #eeeeee;
+    padding: 15px;
+    width: 340px;
+    min-height: 480px;
+    box-sizing: border-box;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .badge {
+    display: inline-block;
+    background: #000000;
+    color: #ffffff;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>UML Sequence Diagram Control Arena</h1>
+<p class="sub">Select an engineering architecture track, then manually control execution using individual step buttons or clock timer sequences.</p>
+
+<div class="controls-row">
+  <button id="btnScenA" class="active">Scenario 1: Happy Path Checkout</button>
+  <button id="btnScenB">Scenario 2: Gateway Timeout</button>
+  <button id="btnScenC">Scenario 3: Stock Allocation Error</button>
+</div>
+
+<div class="action-row">
+  <button id="btnStepForward" style="border-color:#000000; background:#f5f5f5;">Advance Next Step ➔</button>
+  <button id="btnPlayClock">Auto-Play Timeline (Clock Timer)</button>
+  <button id="btnReset">Reset Diagram</button>
+</div>
+
+<div class="workspace">
+  <div class="canvas-container">
+    <canvas id="seqCanvas" width="600" height="480"></canvas>
+  </div>
+
+  <div class="report-box" id="reportPane">
+    <h3>Active Vector Information</h3>
+    <div id="reportContent">Select a scenario pattern, then tap step forward buttons to trace active network messages.</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('seqCanvas');
+const ctx = canvas.getContext('2d');
+const reportContent = document.getElementById('reportContent');
+
+const btnStepForward = document.getElementById('btnStepForward');
+const btnPlayClock = document.getElementById('btnPlayClock');
+const btnReset = document.getElementById('btnReset');
+
+// Core Microservices Interaction Datasets
+const scenarios = {
+  A: [
+    { from: 0, to: 1, type: "sync", label: "submitOrder(cartId)", desc: "<b>Client ➔ API Gateway:</b> User confirms the purchase. The entry gateway initializes a secure processing context thread token.", y: 90 },
+    { from: 1, to: 2, type: "sync", label: "reserveStock(items)", desc: "<b>API Gateway ➔ Inventory:</b> Synchronous request blocks execution while inventory row entries are validated and locked.", y: 150 },
+    { from: 2, to: 1, type: "reply", label: "ACK (Stock Secured)", desc: "<b>Inventory ➔ API Gateway:</b> Target items locked in databases successfully.", y: 210 },
+    { from: 1, to: 3, type: "sync", label: "executeCharge(amount)", desc: "<b>API Gateway ➔ Payment Gateway:</b> Dispatches financial profile validation payloads to the payment network.", y: 280 },
+    { from: 3, to: 1, type: "reply", label: "Return HTTP 200 (Success)", desc: "<b>Payment Gateway ➔ API Gateway:</b> Transaction passes validation.", y: 340 },
+    { from: 1, to: 0, type: "reply", label: "OrderConfirmed (UI)", desc: "<b>API Gateway ➔ Client:</b> Transaction completes. Client app receives the success signature.", y: 410 }
+  ],
+  B: [
+    { from: 0, to: 1, type: "sync", label: "submitOrder(cartId)", desc: "<b>Client ➔ API Gateway:</b> Secure entry transaction pipeline instantiated.", y: 90 },
+    { from: 1, to: 2, type: "sync", label: "reserveStock(items)", desc: "<b>API Gateway ➔ Inventory:</b> Inventory validation fires and claims items.", y: 150 },
+    { from: 2, to: 1, type: "reply", label: "ACK (Stock Secured)", desc: "<b>Inventory ➔ API Gateway:</b> Storage allocation acknowledged.", y: 200 },
+    { from: 1, to: 3, type: "sync", label: "executeCharge() [Try 1]", desc: "<b>API Gateway ➔ Payment Gateway:</b> Request dispatched, but remote infrastructure is unresponsive.", y: 260 },
+    { from: 3, to: 1, type: "lost", label: "❌ TIMEOUT ERROR", desc: "<b>Payment Gateway ➔ API Gateway:</b> Handshake limits breached. The gateway drops the invalid path context thread.", y: 320 },
+    { from: 1, to: 2, type: "sync", label: "releaseStock(items)", desc: "<b>Circuit Breaker Fallback:</b> API Gateway commands Inventory to release the locked items to prevent hanging allocations.", y: 380 },
+    { from: 1, to: 0, type: "reply", label: "Error HTTP 504 (Timeout)", desc: "<b>API Gateway ➔ Client:</b> Graceful fallback notification prevents a application crash.", y: 430 }
+  ],
+  C: [
+    { from: 0, to: 1, type: "sync", label: "submitOrder(cartId)", desc: "<b>Client ➔ API Gateway:</b> Gateway processes request routing configurations.", y: 100 },
+    { from: 1, to: 2, type: "sync", label: "reserveStock(items)", desc: "<b>API Gateway ➔ Inventory:</b> Queries inventory allocations.", y: 190 },
+    { from: 2, to: 1, type: "error", label: "❌ HTTP 409 (Out of Stock)", desc: "<b>Inventory ➔ API Gateway:</b> Database reports insufficient items available. Allocation fails.", y: 290 },
+    { from: 1, to: 0, type: "reply", label: "Return Error (Abort)", desc: "<b>API Gateway ➔ Client:</b> UI surfaces out-of-stock warning; transaction halts cleanly before payment processing.", y: 390 }
+  ]
+};
+
+const actors = ["Client App", "API Gateway", "Inventory Micro", "Payment Gateway"];
+const actorX = [70, 220, 390, 530];
+
+let activeMode = "A";
+let activeStep = 0;
+let clockInterval = null;
+
+function renderCanvasStatic() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Render System Lifelines
+  for (let i = 0; i < actors.length; i++) {
+    const x = actorX[i];
+    
+    // Header Nodes
+    ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#000000"; ctx.lineWidth = 2;
+    ctx.fillRect(x - 60, 15, 120, 35); ctx.strokeRect(x - 60, 15, 120, 35);
+    
+    ctx.fillStyle = "#000000"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+    ctx.fillText(actors[i], x, 36);
+    
+    // Lifeline Channels
+    ctx.strokeStyle = "#000000"; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(x, 50); ctx.lineTo(x, 460); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw message history up to the current active step index
+  const pipelines = scenarios[activeMode];
+  for (let i = 0; i < activeStep; i++) {
+    const s = pipelines[i];
+    
+    // Activation Box Blocks
+    ctx.fillStyle = "#eeeeee"; ctx.strokeStyle = "#000000"; ctx.lineWidth = 2;
+    ctx.fillRect(actorX[s.to] - 6, s.y, 12, 30);
+    ctx.strokeRect(actorX[s.to] - 6, s.y, 12, 30);
+    
+    // Draw Message Arrow Line Vectors
+    drawMessageArrow(actorX[s.from], actorX[s.to], s.y + 10, s.label, s.type === 'reply', s.type === 'error' || s.type === 'lost');
+  }
+}
+
+function drawMessageArrow(startX, endX, y, text, isReply, isError) {
+  ctx.strokeStyle = "#000000";
+  ctx.fillStyle = "#000000";
+  ctx.lineWidth = 2;
+  
+  if (isReply) ctx.setLineDash([4, 4]);
+  
+  ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Arrowhead mapping
+  const tip = 6;
+  ctx.beginPath();
+  if (endX > startX) {
+    ctx.moveTo(endX, y);
+    ctx.lineTo(endX - tip, y - tip);
+    ctx.lineTo(endX - tip, y + tip);
+  } else {
+    ctx.moveTo(endX, y);
+    ctx.lineTo(endX + tip, y - tip);
+    ctx.lineTo(endX + tip, y + tip);
+  }
+  ctx.fill();
+
+  // Draw Label Elements
+  ctx.fillStyle = isError ? "#ff0000" : "#000000";
+  ctx.font = "9px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(text, (startX + endX) / 2, y - 6);
+}
+
+function stepForward() {
+  const currentPipeline = scenarios[activeMode];
+  
+  if (activeStep >= currentPipeline.length) {
+    reportContent.innerHTML = "<h3>Scenario Complete</h3>Clear the layout or select another context model sequence.";
+    clearInterval(clockInterval);
+    btnPlayClock.textContent = "Auto-Play Timeline (Clock Timer)";
+    return;
+  }
+  
+  const stepData = currentPipeline[activeStep];
+  activeStep++;
+  renderCanvasStatic();
+  
+  reportContent.innerHTML = `
+    <h3>Step ${activeStep} of ${currentPipeline.length}</h3>
+    <p>${stepData.desc}</p>
+    <span class="badge">Type: ${stepData.type.toUpperCase()}</span>
+  `;
+}
+
+function runClockAutoplay() {
+  if (clockInterval) {
+    // If running, hit pause toggle parameters
+    clearInterval(clockInterval);
+    clockInterval = null;
+    btnPlayClock.textContent = "Resume Auto-Play";
+  } else {
+    btnPlayClock.textContent = "Pause Clock Timer";
+    // Trigger tick iterations every 1.5 seconds
+    clockInterval = setInterval(() => {
+      if (activeStep >= scenarios[activeMode].length) {
+        clearInterval(clockInterval);
+        clockInterval = null;
+        btnPlayClock.textContent = "Auto-Play Timeline (Clock Timer)";
+      } else {
+        stepForward();
+      }
+    }, 1500);
+  }
+}
+
+function changeTrackMode(modeKey) {
+  clearInterval(clockInterval);
+  clockInterval = null;
+  btnPlayClock.textContent = "Auto-Play Timeline (Clock Timer)";
+  
+  activeMode = modeKey;
+  activeStep = 0;
+  
+  document.querySelectorAll('.controls-row button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btnScen${modeKey}`).classList.add('active');
+  
+  renderCanvasStatic();
+  reportContent.innerHTML = "<h3>Scenario Changed</h3>Advance the step timeline manually or trigger the auto-play clock.";
+}
+
+function resetSimulation() {
+  clearInterval(clockInterval);
+  clockInterval = null;
+  btnPlayClock.textContent = "Auto-Play Timeline (Clock Timer)";
+  activeStep = 0;
+  renderCanvasStatic();
+  reportContent.innerHTML = "Diagram cleared. Select a scenario or advance the step metrics.";
+}
+
+// Bind Button UI Handlers
+btnStepForward.addEventListener('click', stepForward);
+btnPlayClock.addEventListener('click', runClockAutoplay);
+btnReset.addEventListener('click', resetSimulation);
+
+document.getElementById('btnScenA').addEventListener('click', () => changeTrackMode('A'));
+document.getElementById('btnScenB').addEventListener('click', () => changeTrackMode('B'));
+document.getElementById('btnScenC').addEventListener('click', () => changeTrackMode('C'));
+
+// Initial render loop map boot configuration setup
+renderCanvasStatic();
+</script>
+</body>
+</html>

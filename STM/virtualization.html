@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Understanding Virtualization: A Visual Guide</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 20px 0;
+    font-size: 0.9rem;
+    color: #555555;
+  }
+  .layout-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .panel {
+    border: 2px solid #000000;
+    padding: 15px;
+    box-sizing: border-box;
+    background: #ffffff;
+    min-height: 500px;
+  }
+  .controls-panel {
+    width: 320px;
+    background: #eeeeee;
+  }
+  .canvas-container {
+    border: 2px solid #000000;
+    background: #ffffff;
+  }
+  .explanation-panel {
+    width: 400px;
+  }
+  .btn-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 12px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: left;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .action-btn {
+    background: #000000;
+    color: #ffffff;
+    text-align: center;
+    width: 100%;
+    margin-top: 20px;
+  }
+  .action-btn:hover {
+    background: #333333;
+  }
+  .concept-box {
+    background: #eeeeee;
+    padding: 12px;
+    border-left: 4px solid #000000;
+    margin: 15px 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  .badge {
+    display: inline-block;
+    background: #000000;
+    color: #ffffff;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>The Core Concept of Virtualization</h1>
+<p class="sub">Switch between the architectures to see how software layers change the way computer hardware is used.</p>
+
+<div class="layout-grid">
+  <!-- Controls Panel -->
+  <div class="panel controls-panel">
+    <h3>Choose Architecture</h3>
+    <div class="btn-stack">
+      <button id="btnNormal" class="active">
+        <b>1. Traditional Computer</b><br/>
+        <small>1 Hardware → 1 OS → 1 User Environment</small>
+      </button>
+      <button id="btnVirtual">
+        <b>2. Virtualized Computer</b><br/>
+        <small>1 Hardware → Hypervisor → Multiple Isolated VMs</small>
+      </button>
+    </div>
+    <hr style="border:0; border-top:1px solid #000; margin: 30px 0;">
+    <button id="btnAnimate" class="action-btn">▶ Simulate Resource Flow</button>
+  </div>
+
+  <!-- Interactive Graphic Canvas -->
+  <div class="canvas-container">
+    <canvas id="virtCanvas" width="400" height="500"></canvas>
+  </div>
+
+  <!-- Explanation Dashboard -->
+  <div class="panel explanation-panel">
+    <h3>Student Lesson Dashboard</h3>
+    <div id="lessonOutput">Loading lesson plan...</div>
+    
+    <h3 style="margin-top:25px;">Key Takeaway for Students</h3>
+    <div id="takeawayBox" class="concept-box">
+      Select a computer layout on the left to begin the lesson.
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('virtCanvas');
+const ctx = canvas.getContext('2d');
+const lessonOutput = document.getElementById('lessonOutput');
+const takeawayBox = document.getElementById('takeawayBox');
+
+let currentMode = "NORMAL"; // NORMAL or VIRTUAL
+let animFrame = -1;
+let animTimer = null;
+
+const lessons = {
+  NORMAL: {
+    title: "Traditional Computer Architecture",
+    takeaway: "<b>The Problem:</b> The Single Operating System completely locks down the hardware underneath. If you want to run an application that requires Linux, but your computer runs Windows, you cannot do it simultaneously on this setup. If your apps only use 10% of the hardware power, the remaining 90% is completely wasted.",
+    desc: "<b>How it works:</b> Here, the apps run directly on top of one Operating System (like Windows or macOS). The Operating System has direct control over the physical CPU, RAM, and Storage. It acts like a strict single-tenant building."
+  },
+  VIRTUAL: {
+    title: "Virtualized Computer Architecture",
+    takeaway: "<b>The Solution:</b> By introducing the <b>Hypervisor</b> layer, we trick the operating systems! The hypervisor slices the physical hardware into separate virtual packages. Now, you can run a Windows VM, a Linux VM, and a macOS VM all at the exact same time on the exact same physical machine without them interfering with each other.",
+    desc: "<b>How it works:</b> A clever software layer called a <b>Hypervisor</b> sits right on top of the physical hardware. Instead of letting one OS take everything, it creates abstract 'Virtual Machines' (VMs). Each VM thinks it is a real computer with its own hardware."
+  }
+};
+
+function setMode(mode) {
+  clearInterval(animTimer);
+  currentMode = mode;
+  animFrame = -1;
+  
+  document.getElementById('btnNormal').className = mode === "NORMAL" ? "active" : "";
+  document.getElementById('btnVirtual').className = mode === "VIRTUAL" ? "active" : "";
+  
+  const lesson = lessons[mode];
+  lessonOutput.innerHTML = `
+    <span class="badge">${lesson.title}</span>
+    <p style="font-size:0.85rem; line-height:1.5; margin-top:10px;">${lesson.desc}</p>
+  `;
+  takeawayBox.innerHTML = lesson.takeaway;
+  
+  drawArchitecture();
+}
+
+function drawArchitecture() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Always draw the foundation: Physical Hardware Base Layer
+  drawBox(50, 420, 300, 50, "PHYSICAL HARDWARE (CPU, RAM, Storage)", "#eeeeee", true);
+  
+  if (currentMode === "NORMAL") {
+    // Traditional computer layout: 1 OS layer, 1 App layer stacked directly
+    drawBox(50, 280, 300, 60, "SINGLE OPERATING SYSTEM\n(e.g., Windows OS)", "#ffffff", true);
+    
+    // Draw Apps
+    drawBox(60, 130, 80, 50, "App A\n(Word)", "#ffffff", false);
+    drawBox(160, 130, 80, 50, "App B\n(Chrome)", "#ffffff", false);
+    drawBox(260, 130, 80, 50, "App C\n(Game)", "#ffffff", false);
+    
+    // Connect layers with static lines
+    drawVerticalLine(200, 420, 340); // Hardware to OS
+    drawVerticalLine(100, 280, 180); // OS to App A
+    drawVerticalLine(200, 280, 180); // OS to App B
+    drawVerticalLine(300, 280, 180); // OS to App C
+    
+  } else {
+    // Virtualized layout: Add hypervisor layer right on top of hardware
+    drawBox(50, 330, 300, 50, "HYPERVISOR SOFTWARE LAYER\n(The Resource Divider)", "#000000", true, "#ffffff");
+    
+    // Connect Hardware to Hypervisor
+    drawVerticalLine(200, 420, 380);
+    
+    // Draw 3 distinct Virtual Machines (Silos)
+    // VM 1
+    drawBox(55, 190, 85, 100, "VIRTUAL MACHINE 1\n\nGuest OS:\nLinux", "#ffffff", false);
+    drawBox(62, 110, 70, 40, "App\n(Web Server)", "#ffffff", false);
+    drawVerticalLine(97, 330, 290); // Hypervisor to VM1
+    drawVerticalLine(97, 190, 150); // VM1 to App
+    
+    // VM 2
+    drawBox(157, 190, 85, 100, "VIRTUAL MACHINE 2\n\nGuest OS:\nWindows", "#ffffff", false);
+    drawBox(164, 110, 70, 40, "App\n(Database)", "#ffffff", false);
+    drawVerticalLine(200, 330, 290); // Hypervisor to VM2
+    drawVerticalLine(200, 190, 150); // VM2 to App
+
+    // VM 3
+    drawBox(260, 190, 85, 100, "VIRTUAL MACHINE 3\n\nGuest OS:\nmacOS", "#ffffff", false);
+    drawBox(267, 110, 70, 40, "App\n(Photoshop)", "#ffffff", false);
+    drawVerticalLine(302, 330, 290); // Hypervisor to VM3
+    drawVerticalLine(302, 190, 150); // VM3 to App
+  }
+  
+  animateResourcePackets();
+}
+
+function drawBox(x, y, w, h, text, bgColor, boldText, textColor = "#000000") {
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 2;
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeRect(x, y, w, h);
+  
+  ctx.fillStyle = textColor;
+  ctx.font = boldText ? "bold 10px monospace" : "10px monospace";
+  ctx.textAlign = "center";
+  
+  let lines = text.split('\n');
+  if (lines.length === 1) {
+    ctx.fillText(text, x + w / 2, y + h / 2 + 4);
+  } else {
+    let startY = y + (h / 2) - ((lines.length - 1) * 6) + 2;
+    lines.forEach((line, index) => {
+      ctx.fillText(line, x + w / 2, startY + (index * 13));
+    });
+  }
+}
+
+function drawVerticalLine(x, y1, y2) {
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y1);
+  ctx.lineTo(x, y2);
+  ctx.stroke();
+}
+
+function animateResourcePackets() {
+  if (animFrame < 0) return;
+  
+  ctx.fillStyle = "#ff0000";
+  let radius = 5;
+  
+  if (currentMode === "NORMAL") {
+    // Pulse resource request signals from all apps down into the one OS, then down to hardware
+    let progress = (animFrame % 30) / 30;
+    
+    // Packets traveling down from apps to OS
+    drawCircle(100, 140 + (140 * progress), radius);
+    drawCircle(200, 140 + (140 * progress), radius);
+    drawCircle(300, 140 + (140 * progress), radius);
+    
+    // Packet traveling from OS down to Physical Hardware
+    drawCircle(200, 290 + (130 * progress), radius);
+    
+  } else {
+    // Show segregated resource tracks passing safely through the hypervisor
+    let progress = (animFrame % 30) / 30;
+    
+    // Data stream color channels per VM
+    ctx.fillStyle = "#ff0000"; // VM1 (Red Track)
+    drawCircle(97, 120 + (70 * progress), radius);
+    drawCircle(97, 210 + (120 * progress), radius);
+    
+    ctx.fillStyle = "#0000ff"; // VM2 (Blue Track)
+    drawCircle(200, 120 + (70 * progress), radius);
+    drawCircle(200, 210 + (120 * progress), radius);
+    
+    ctx.fillStyle = "#00aa00"; // VM3 (Green Track)
+    drawCircle(302, 120 + (70 * progress), radius);
+    drawCircle(302, 210 + (120 * progress), radius);
+
+    // Consolidated packets going into physical resource pool below hypervisor
+    ctx.fillStyle = "#000000";
+    drawCircle(200, 350 + (70 * progress), radius);
+  }
+}
+
+function drawCircle(x, y, r) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, 2 * Math.PI);
+  ctx.fill();
+}
+
+function triggerAnimation() {
+  clearInterval(animTimer);
+  animFrame = 0;
+  
+  animTimer = setInterval(() => {
+    animFrame++;
+    drawArchitecture();
+    // Loop the demonstration indefinitely until switched
+    if (animFrame > 120) animFrame = 0;
+  }, 40);
+}
+
+document.getElementById('btnNormal').addEventListener('click', () => setMode('NORMAL'));
+document.getElementById('btnVirtual').addEventListener('click', () => setMode('VIRTUAL'));
+document.getElementById('btnAnimate').addEventListener('click', triggerAnimation);
+
+// Initial Load Configuration
+setMode('NORMAL');
+</script>
+</body>
+</html>

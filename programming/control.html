@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>C Control Structures & Flowchart Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+  }
+  .controls {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 2px solid #000000;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  select, button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 6px 14px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover, select:hover {
+    background: #eeeeee;
+  }
+  .workspace {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .code-container {
+    border: 2px solid #000000;
+    width: 380px;
+    background: #eeeeee;
+    padding: 10px 0;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .code-line {
+    padding: 3px 15px 3px 35px;
+    line-height: 1.5;
+    font-size: 0.85rem;
+    position: relative;
+    white-space: pre;
+  }
+  .code-line.active {
+    background: #000000 !important;
+    color: #ffffff !important;
+  }
+  .code-line.active::before {
+    content: "➔";
+    position: absolute;
+    left: 10px;
+    color: inherit;
+    font-weight: bold;
+  }
+  
+  /* --- Flowchart Sandbox Styles --- */
+  .flowchart-sandbox {
+    border: 2px solid #000000;
+    flex-grow: 1;
+    min-width: 460px;
+    height: 520px;
+    position: relative;
+    background: #ffffff;
+    overflow: hidden;
+  }
+  .flow-node {
+    position: absolute;
+    border: 2px solid #000000;
+    background: #ffffff;
+    color: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-sizing: border-box;
+    padding: 5px;
+    z-index: 2;
+  }
+  .flow-node.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  
+  /* Shapes */
+  .shape-process { width: 120px; height: 40px; }
+  .shape-decision { 
+    width: 90px; height: 90px; 
+    transform: rotate(45deg); 
+  }
+  .shape-decision span { transform: rotate(-45deg); }
+  .shape-terminal { width: 100px; height: 40px; border-radius: 20px; }
+
+  /* --- Micro-Vector Connectors --- */
+  .connector {
+    position: absolute;
+    border: 0 dashed #000000;
+    z-index: 1;
+    box-sizing: border-box;
+  }
+  
+  .arrow-down { border-left-width: 2px; }
+  .arrow-down::after {
+    content: ""; position: absolute; bottom: 0; left: -5px;
+    width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 6px solid #000000;
+  }
+
+  .arrow-l-left { border-top-width: 2px; border-left-width: 2px; }
+  .arrow-l-left::after {
+    content: ""; position: absolute; bottom: 0; left: -5px;
+    width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 6px solid #000000;
+  }
+
+  .arrow-l-right { border-top-width: 2px; border-right-width: 2px; }
+  .arrow-l-right::after {
+    content: ""; position: absolute; bottom: 0; right: -5px;
+    width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 6px solid #000000;
+  }
+
+  .arrow-loop-back { border-bottom-width: 2px; border-left-width: 2px; border-top-width: 2px; }
+  .arrow-loop-back::after {
+    content: ""; position: absolute; top: 0; right: -4px;
+    width: 0; height: 0;
+    border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+    border-left: 6px solid #000000;
+  }
+
+  .label-text {
+    position: absolute; font-size: 0.7rem; font-weight: bold;
+    background: #ffffff; padding: 1px 3px; z-index: 3;
+  }
+
+  .status-box {
+    margin-top: 20px; padding: 12px; border: 2px solid #000000;
+    max-width: 100%; font-size: 0.85rem; line-height: 1.4;
+    min-height: 50px; box-sizing: border-box;
+  }
+</style>
+</head>
+<body>
+
+<h1>C Control Structures & Flowchart Visualizer</h1>
+<p class="sub">Step through C control flows dynamically. Watch structural branches, loop statements, and low-level jumps track in parallel.</p>
+
+<div class="controls">
+  <label>Structure Selector:</label>
+  <select id="structureSelect">
+    <option value="ifelse">1. If-Else Conditional Selection</option>
+    <option value="switchcase">2. Switch-Case Multi-Way Selection</option>
+    <option value="whileloop">3. While Pre-Test Loop</option>
+    <option value="forloop">4. For Count-Driven Loop</option>
+    <option value="dowhile">5. Do-While Post-Test Loop</option>
+    <option value="gotoloop">6. Goto Unconditional Jump</option>
+  </select>
+  <button id="btnStep">Step Execution ➔</button>
+  <button id="btnReset">Reset</button>
+</div>
+
+<div class="workspace">
+  <div class="code-container" id="codeViewport"></div>
+
+  <div class="flowchart-sandbox" id="flowchartSandbox"></div>
+</div>
+
+<div class="status-box" id="statusBox">
+  Select a structure and click "Step Execution".
+</div>
+
+<script>
+const select = document.getElementById('structureSelect');
+const btnStep = document.getElementById('btnStep');
+const btnReset = document.getElementById('btnReset');
+const codeViewport = document.getElementById('codeViewport');
+const sandbox = document.getElementById('flowchartSandbox');
+const statusBox = document.getElementById('statusBox');
+
+let stepIndex = 0;
+
+const programData = {
+  ifelse: {
+    lines: [
+      "int score = 75;",
+      "if (score >= 50) {",
+      "  printf(\"PASS\");",
+      "} else {",
+      "  printf(\"FAIL\");",
+      "}",
+      "// Continue..."
+    ],
+    steps: [
+      { line: 0, node: 'node-init', msg: "Allocating <tt>score = 75</tt> on local stack frame." },
+      { line: 1, node: 'node-dec',  msg: "Conditional statement evaluation: Is <tt>75 >= 50</tt>? (TRUE)" },
+      { line: 2, node: 'node-pass', msg: "Condition TRUE. Execution paths left directly into statement scope block." },
+      { line: 6, node: 'node-end',  msg: "Exits conditional construct bounds. Skips the <tt>else</tt> logic path entirely." }
+    ],
+    nodes: [
+      ['terminal', 'node-start', 'START', 20, 160],
+      ['process',  'node-init',  'score = 75', 90, 150],
+      ['decision', 'node-dec',   'score >= 50?', 165, 165],
+      ['process',  'node-pass',  'PRINT "PASS"', 240, 30], 
+      ['process',  'node-fail',  'PRINT "FAIL"', 240, 270], 
+      ['terminal', 'node-end',   'END', 360, 160]
+    ],
+    connectors: [
+       { type: 'down', top: 60, left: 210, width: 2, height: 30 },
+       { type: 'down', top: 130, left: 210, width: 2, height: 35 },
+       { type: 'l-left', top: 210, left: 90, width: 75, height: 30, text: 'T', lblTop: 190, lblLeft: 120 },
+       { type: 'l-right', top: 210, left: 255, width: 75, height: 30, text: 'F', lblTop: 190, lblLeft: 275 },
+       { type: 'l-right', top: 280, left: 90, width: 120, height: 80 },
+       { type: 'l-left', top: 280, left: 210, width: 120, height: 80 }
+    ]
+  },
+  switchcase: {
+    lines: [
+      "int choice = 2;",
+      "switch(choice) {",
+      "  case 1:  printf(\"One\"); break;",
+      "  case 2:  printf(\"Two\"); break;",
+      "  default: printf(\"None\");",
+      "}"
+    ],
+    steps: [
+      { line: 0, node: 'node-init', msg: "Initialize selector switch index evaluation variable <tt>choice = 2</tt>." },
+      { line: 1, node: 'node-dec',  msg: "Evaluate Multi-way matching control block flags against variable state." },
+      { line: 3, node: 'node-c2',   msg: "Matches literal index <tt>case 2</tt>. Jump pointer evaluates directly down lane." },
+      { line: 5, node: 'node-end',  msg: "Encounters <tt>break;</tt> command keyword instruction, terminating structural evaluation." }
+    ],
+    nodes: [
+      ['terminal', 'node-start', 'START', 15, 160],
+      ['process',  'node-init',  'choice = 2', 75, 150],
+      ['decision', 'node-dec',   'switch text', 145, 165],
+      ['process',  'node-c1',    'CASE 1: "One"', 240, 20],
+      ['process',  'node-c2',    'CASE 2: "Two"', 240, 150],
+      ['process',  'node-def',   'DEFAULT', 240, 280],
+      ['terminal', 'node-end',   'END', 360, 160]
+    ],
+    connectors: [
+       { type: 'down', top: 55, left: 210, width: 2, height: 20 },
+       { type: 'down', top: 115, left: 210, width: 2, height: 30 },
+       { type: 'l-left', top: 190, left: 80, width: 85, height: 50, text: '==1', lblTop: 170, lblLeft: 100 },
+       { type: 'down', top: 235, left: 210, width: 2, height: 5, text: '==2', lblTop: 218, lblLeft: 218 },
+       { type: 'l-right', top: 190, left: 255, width: 85, height: 50, text: 'else', lblTop: 170, lblLeft: 275 },
+       { type: 'l-right', top: 280, left: 80, width: 130, height: 80 },
+       { type: 'down', top: 280, left: 210, width: 2, height: 80 },
+       { type: 'l-left', top: 280, left: 210, width: 130, height: 80 }
+    ]
+  },
+  whileloop: {
+    lines: [
+      "int c = 0;",
+      "while (c < 2) {",
+      "  c++;",
+      "}",
+      "// Exit"
+    ],
+    steps: [
+      { line: 0, node: 'node-init', msg: "Initialize pre-test track boundary index value <tt>c = 0</tt>." },
+      { line: 1, node: 'node-dec',  msg: "Pre-test conditional check logic gate evaluates: <tt>0 < 2</tt>? (TRUE)" },
+      { line: 2, node: 'node-body', msg: "Enters loop body block payload. Increments <tt>c</tt> index counter value to 1." },
+      { line: 1, node: 'node-dec',  msg: "Loops straight back up to top validation gate check: Is <tt>1 < 2</tt>? (TRUE)" },
+      { line: 2, node: 'node-body', msg: "Condition stays valid. Second execution pass inside body triggers, changing <tt>c</tt> value to 2." },
+      { line: 1, node: 'node-dec',  msg: "Loops straight back up to top validation gate check: Is <tt>2 < 2</tt>? (FALSE)" },
+      { line: 4, node: 'node-end',  msg: "Expression evaluation turns **FALSE**. Structural scope logic drops past loop." }
+    ],
+    nodes: [
+      ['terminal', 'node-start', 'START', 20, 160],
+      ['process',  'node-init',  'c = 0', 90, 150],
+      ['decision', 'node-dec',   'c < 2?', 165, 165],
+      ['process',  'node-body',  'c++', 290, 150],
+      ['terminal', 'node-end',   'END', 400, 160]
+    ],
+    connectors: [
+       { type: 'down', top: 60, left: 210, width: 2, height: 30 },
+       { type: 'down', top: 130, left: 210, width: 2, height: 35 },
+       { type: 'down', top: 255, left: 210, width: 2, height: 35, text: 'T', lblTop: 260, lblLeft: 220 },
+       { type: 'loop-back', top: 210, left: 90, width: 60, height: 100 },
+       { type: 'l-right', top: 210, left: 255, width: 95, height: 190, text: 'F', lblTop: 190, lblLeft: 280 }
+    ]
+  },
+  forloop: {
+    lines: [
+      "int i;",
+      "for(i=0; i<2; i++){",
+      "  // body",
+      "}",
+      "// Exit"
+    ],
+    steps: [
+      { line: 0, node: 'node-declare', msg: "Stack frames map out entry point configuration spaces for integer <tt>i</tt>." },
+      { line: 1, node: 'node-init',    msg: "FOR Initialization segment clause triggers: assigning value <tt>i = 0</tt>." },
+      { line: 1, node: 'node-dec',     msg: "FOR Condition clause check verifies state: Is <tt>0 < 2</tt>? (TRUE)" },
+      { line: 2, node: 'node-body',    msg: "Enters body block framework scope sequence." },
+      { line: 1, node: 'node-inc',     msg: "FOR Increment clause update expression processes: executing <tt>i++</tt> (<tt>i</tt> becomes 1)." },
+      { line: 1, node: 'node-dec',     msg: "Validating iteration guard constraint parameters: Is <tt>1 < 2</tt>? (TRUE)" },
+      { line: 2, node: 'node-body',    msg: "Loop framework iteration execution pass two processes loop body." },
+      { line: 1, node: 'node-inc',     msg: "Executing loop step update tracking command: <tt>i++</tt> (<tt>i</tt> becomes 2)." },
+      { line: 1, node: 'node-dec',     msg: "Validating iteration guard constraint parameters: Is <tt>2 < 2</tt>? (FALSE)" },
+      { line: 4, node: 'node-end',     msg: "Condition evaluates to **FALSE**. Exit loop track sequence structures successfully." }
+    ],
+    nodes: [
+      ['terminal', 'node-start', 'START', 10, 160],
+      ['process',  'node-declare','int i', 70, 150],
+      ['process',  'node-init',   'i = 0', 130, 150],
+      ['decision', 'node-dec',    'i < 2?', 200, 165],
+      ['process',  'node-body',   'Execute Body', 310, 60],
+      ['process',  'node-inc',    'i++', 310, 240],
+      ['terminal', 'node-end',    'END', 430, 160]
+    ],
+    connectors: [
+       { type: 'down', top: 50, left: 210, width: 2, height: 20 },
+       { type: 'down', top: 110, left: 210, width: 2, height: 20 },
+       { type: 'down', top: 170, left: 210, width: 2, height: 30 },
+       { type: 'l-left', top: 245, left: 120, width: 45, height: 65, text: 'T', lblTop: 225, lblLeft: 135 },
+       { type: 'l-right', top: 245, left: 255, width: 45, height: 65, text: 'F', lblTop: 225, lblLeft: 270 },
+       { type: 'down', top: 350, left: 120, width: 2, height: 30 },
+       { type: 'l-right', top: 380, left: 120, width: 180, height: 0 },
+       { type: 'loop-back', top: 245, left: 210, width: 90, height: 65 }
+    ]
+  },
+  dowhile: {
+    lines: [
+      "int k = 5;",
+      "do {",
+      "  k++;",
+      "} while (k < 5);",
+      "// Exit"
+    ],
+    steps: [
+      { line: 0, node: 'node-init', msg: "Allocating post-test parameter variable tracking structure index <tt>k = 5</tt>." },
+      { line: 2, node: 'node-body', msg: "<b>Do block entry:</b> Logic bypasses evaluation constraints completely, executing body code blocks *at least once* directly. <tt>k</tt> increments to 6." },
+      { line: 3, node: 'node-dec',  msg: "Post-test comparative check expression triggers: Is <tt>6 < 5</tt>? (FALSE)" },
+      { line: 4, node: 'node-end',  msg: "Loop test conditional evaluation proves **FALSE**. Loop context tracks drop out immediately downwards." }
+    ],
+    nodes: [
+      ['terminal', 'node-start', 'START', 20, 160],
+      ['process',  'node-init',  'k = 5', 90, 150],
+      ['process',  'node-body',  'k++', 170, 150],
+      ['decision', 'node-dec',   'k < 5?', 245, 165],
+      ['terminal', 'node-end',   'END', 380, 160]
+    ],
+    connectors: [
+       { type: 'down', top: 60, left: 210, width: 2, height: 30 },
+       { type: 'down', top: 130, left: 210, width: 2, height: 40 },
+       { type: 'down', top: 210, left: 210, width: 2, height: 35 },
+       // Loop return hook up to side of Body frame block components
+       { type: 'loop-back', top: 190, left: 90, width: 60, height: 100, text: 'T', lblTop: 270, lblLeft: 120 },
+       { type: 'down', top: 335, left: 210, width: 2, height: 45, text: 'F', lblTop: 340, lblLeft: 220 }
+    ]
+  },
+  gotoloop: {
+    lines: [
+      "int x = 1;",
+      "LOOP_TAG:",
+      "x++;",
+      "if (x <= 2) goto LOOP_TAG;",
+      "// Terminate"
+    ],
+    steps: [
+      { line: 0, node: 'node-init', msg: "Initialize tracking context variable state data parameter <tt>x = 1</tt>." },
+      { line: 1, node: 'node-tag',  msg: "Registered jump target label tracking identifier <tt>LOOP_TAG</tt> in translation unit map structures." },
+      { line: 2, node: 'node-inc',  msg: "Execute statement operation: increment counter variable values (<tt>x</tt> becomes 2)." },
+      { line: 3, node: 'node-dec',  msg: "Evaluate branch conditional: Is <tt>2 <= 2</tt>? (TRUE). Activating unconditional low-level instruction pointer swap jump." },
+      { line: 1, node: 'node-tag',  msg: "<b>Goto Jump Fired:</b> Instruction register forcibly updates address space location vector backward to <tt>LOOP_TAG</tt>." },
+      { line: 2, node: 'node-inc',  msg: "Increment operation re-executes on logic rerun path pass (<tt>x</tt> becomes 3)." },
+      { line: 3, node: 'node-dec',  msg: "Re-evaluate condition parameters: Is <tt>3 <= 2</tt>? (FALSE). Jump bypass structural parameters drop down path." },
+      { line: 4, node: 'node-end',  msg: "Pipeline sequential instruction track processes through end cleanly." }
+    ],
+    nodes: [
+      ['terminal', 'node-start', 'START', 15, 160],
+      ['process',  'node-init',  'x = 1', 75, 150],
+      ['terminal', 'node-tag',   'LOOP_TAG:', 140, 160],
+      ['process',  'node-inc',   'x++', 200, 150],
+      ['decision', 'node-dec',   'x <= 2?', 265, 165],
+      ['terminal', 'node-end',   'END', 400, 160]
+    ],
+    connectors: [
+       { type: 'down', top: 55, left: 210, width: 2, height: 20 },
+       { type: 'down', top: 115, left: 210, width: 2, height: 25 },
+       { type: 'down', top: 180, left: 210, width: 2, height: 20 },
+       { type: 'down', top: 240, left: 210, width: 2, height: 25 },
+       // Unconditional goto loop hook wire routing
+       { type: 'loop-back', top: 160, left: 80, width: 70, height: 150, text: 'GOTO', lblTop: 295, lblLeft: 110 },
+       { type: 'down', top: 355, left: 210, width: 2, height: 45, text: 'F', lblTop: 360, lblLeft: 220 }
+    ]
+  }
+};
+
+// --- Execution Display Control Engines ---
+
+function renderCodeAndFlowchart() {
+  const prog = programData[select.value];
+  
+  codeViewport.innerHTML = '';
+  prog.lines.forEach((line, index) => {
+    const div = document.createElement('div');
+    div.className = 'code-line';
+    div.id = `code-line-${index}`;
+    div.textContent = line;
+    codeViewport.appendChild(div);
+  });
+
+  sandbox.innerHTML = '';
+
+  if (prog.connectors) {
+    prog.connectors.forEach(c => {
+      const conn = document.createElement('div');
+      conn.className = `connector arrow-${c.type}`;
+      conn.style.top = `${c.top}px`;
+      conn.style.left = `${c.left}px`;
+      conn.style.width = `${c.width}px`;
+      conn.style.height = `${c.height}px`;
+      sandbox.appendChild(conn);
+
+      if (c.text) {
+        const lbl = document.createElement('div');
+        lbl.className = 'label-text';
+        lbl.style.top = `${c.lblTop}px`;
+        lbl.style.left = `${c.lblLeft}px`;
+        lbl.textContent = c.text;
+        sandbox.appendChild(lbl);
+      }
+    });
+  }
+
+  prog.nodes.forEach(nData => {
+    const [type, id, text, top, left] = nData;
+    const node = document.createElement('div');
+    node.id = id;
+    node.className = `flow-node shape-${type}`;
+    node.style.top = `${top}px`;
+    node.style.left = `${left}px`;
+    
+    const span = document.createElement('span');
+    span.textContent = text;
+    node.appendChild(span);
+    
+    sandbox.appendChild(node);
+  });
+}
+
+function runStep() {
+  const prog = programData[select.value];
+  
+  if (stepIndex >= prog.steps.length) {
+    statusBox.innerHTML = "<b>Sequence Completed.</b> Reset to re-run pipeline maps.";
+    document.querySelectorAll('.code-line, .flow-node').forEach(el => el.classList.remove('active'));
+    return;
+  }
+
+  document.querySelectorAll('.code-line, .flow-node').forEach(el => el.classList.remove('active'));
+
+  const currentStep = prog.steps[stepIndex];
+  
+  const codeLineEl = document.getElementById(`code-line-${currentStep.line}`);
+  if (codeLineEl) codeLineEl.classList.add('active');
+
+  const nodeEl = document.getElementById(currentStep.node);
+  if (nodeEl) nodeEl.classList.add('active');
+
+  statusBox.innerHTML = `[Step ${stepIndex + 1}/${prog.steps.length}] ${currentStep.msg}`;
+
+  stepIndex++;
+}
+
+function resetSimulation() {
+  stepIndex = 0;
+  renderCodeAndFlowchart();
+  statusBox.innerHTML = "Click 'Step Execution' to trace the code structures.";
+}
+
+select.addEventListener('change', resetSimulation);
+btnStep.addEventListener('click', runStep);
+btnReset.addEventListener('click', resetSimulation);
+
+resetSimulation();
+</script>
+</body>
+</html>

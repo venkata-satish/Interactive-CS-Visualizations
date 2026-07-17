@@ -1,0 +1,103 @@
+<h2 class="sr-only">Interactive region-based segmentation demo: click a pixel to grow a region from it based on intensity similarity</h2>
+
+<ul style="margin:0 0 12px;padding-left:18px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+  <li>Each cell is a "pixel" with a grayscale intensity (a synthetic image with two brighter blobs on a noisy dark background).</li>
+  <li>Click any cell to pick it as a <span style="color:var(--text-primary);">seed</span>.</li>
+  <li>The algorithm grows outward to neighboring pixels (4-connectivity), adding any neighbor whose intensity is within the threshold of the seed's value — the core idea of region-based segmentation: start from a seed and merge neighboring pixels that are similar enough.</li>
+  <li>Raise or lower the threshold to see the region grow larger (more lenient) or stay tight (stricter).</li>
+</ul>
+
+<div style="display:flex;align-items:center;gap:12px;margin:0 0 10px;">
+  <label style="font-size:14px;color:var(--text-secondary);">Similarity threshold</label>
+  <input type="range" min="5" max="80" value="25" step="1" id="thresh" style="flex:1;">
+  <span id="thresh-out" style="font-size:14px;font-weight:500;min-width:28px;">25</span>
+</div>
+
+<div id="grid" style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;width:70%;max-width:340px;margin:0 auto;aspect-ratio:20/14;"></div>
+
+<div style="display:flex;gap:16px;margin:10px 0 0;font-size:13px;color:var(--text-secondary);justify-content:center;">
+  <span id="size-out"></span>
+</div>
+
+<script>
+(function(){
+  const COLS = 20, ROWS = 14;
+  const grid = document.getElementById('grid');
+  const threshInput = document.getElementById('thresh');
+  const threshOut = document.getElementById('thresh-out');
+  const sizeOut = document.getElementById('size-out');
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+
+  const values = [];
+  for(let y=0;y<ROWS;y++){
+    const row = [];
+    for(let x=0;x<COLS;x++){
+      let v = rand(30,55);
+      const dx1 = x-6, dy1 = y-4;
+      if (dx1*dx1 + dy1*dy1 < 12) v = rand(185,210);
+      const dx2 = x-14, dy2 = y-9;
+      if (dx2*dx2*0.6 + dy2*dy2 < 10) v = rand(110,135);
+      row.push(Math.round(v));
+    }
+    values.push(row);
+  }
+
+  const cells = [];
+  for(let y=0;y<ROWS;y++){
+    const rowEls = [];
+    for(let x=0;x<COLS;x++){
+      const v = values[y][x];
+      const div = document.createElement('div');
+      div.style.background = 'rgb('+v+','+v+','+v+')';
+      div.style.borderRadius = '1px';
+      div.style.cursor = 'pointer';
+      div.style.transition = 'outline .1s';
+      div.dataset.x = x; div.dataset.y = y;
+      div.addEventListener('click', () => segment(x,y));
+      grid.appendChild(div);
+      rowEls.push(div);
+    }
+    cells.push(rowEls);
+  }
+
+  function paintBase(){
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        const v = values[y][x];
+        cells[y][x].style.background = 'rgb('+v+','+v+','+v+')';
+        cells[y][x].style.outline = 'none';
+      }
+    }
+  }
+
+  function segment(sx, sy){
+    paintBase();
+    const threshold = parseInt(threshInput.value, 10);
+    const seedVal = values[sy][sx];
+    const visited = Array.from({length:ROWS},()=>Array(COLS).fill(false));
+    const stack = [[sx,sy]];
+    visited[sy][sx] = true;
+    let count = 0;
+    while(stack.length){
+      const [x,y] = stack.pop();
+      count++;
+      cells[y][x].style.background = '#7F77DD';
+      cells[y][x].style.outline = '1px solid #26215C';
+      const neighbors = [[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+      for(const [nx,ny] of neighbors){
+        if(nx<0||ny<0||nx>=COLS||ny>=ROWS||visited[ny][nx]) continue;
+        if(Math.abs(values[ny][nx]-seedVal) <= threshold){
+          visited[ny][nx] = true;
+          stack.push([nx,ny]);
+        }
+      }
+    }
+    sizeOut.textContent = count + ' pixels in region (seed value ' + seedVal + ')';
+  }
+
+  threshInput.addEventListener('input', () => {
+    threshOut.textContent = threshInput.value;
+  });
+})();
+</script>

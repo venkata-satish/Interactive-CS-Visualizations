@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Unified Variable Creation, Allocation & GC Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+  }
+  .controls {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 2px solid #000000;
+    display: flex;
+    gap: 12px;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 8px 16px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  .workspace {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  /* Panels */
+  .panel {
+    border: 2px solid #000000;
+    padding: 12px;
+    min-height: 420px;
+    box-sizing: border-box;
+    background: #ffffff;
+  }
+  .code-container { width: 330px; background: #eeeeee; padding: 10px 0; min-height: 420px; border: 2px solid #000000;}
+  .stack-panel { width: 240px; }
+  .heap-panel { width: 340px; }
+  
+  .panel-title {
+    font-weight: bold;
+    font-size: 0.85rem;
+    border-bottom: 2px solid #000000;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+  }
+  .code-line {
+    padding: 3px 10px 3px 25px;
+    font-size: 0.8rem;
+    white-space: pre;
+    position: relative;
+  }
+  .code-line.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .code-line.active::before {
+    content: "➔";
+    position: absolute;
+    left: 8px;
+    color: inherit;
+  }
+  .mem-container {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 12px;
+  }
+  .var-box {
+    border: 2px solid #000000;
+    padding: 8px;
+    background: #ffffff;
+    font-size: 0.75rem;
+    transition: all 0.3s ease;
+  }
+  .var-box.highlight-create {
+    background: #000000;
+    color: #ffffff;
+  }
+  .var-box.gc-orphan {
+    border: 2px dashed #ff0000;
+    color: #ff0000;
+  }
+  .var-box.gc-swept {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  .meta-txt {
+    font-size: 0.65rem;
+    color: #555555;
+    margin-top: 4px;
+  }
+  .status-box {
+    margin-top: 20px;
+    padding: 12px;
+    border: 2px solid #000000;
+    max-width: 950px;
+    font-size: 0.85rem;
+    min-height: 50px;
+    box-sizing: border-box;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<h1>Unified Variable Creation, Allocation & Garbage Collection</h1>
+<p class="sub">Trace a live sample C program line-by-line to see primitive stack frames, pointer mappings, and GC sweeps execute in parallel.</p>
+
+<div class="controls">
+  <button id="btnStep">Step Code Execution ➔</button>
+  <button id="btnReset">Reset Simulation</button>
+</div>
+
+<div class="workspace">
+  <div class="code-container">
+    <div style="font-weight:bold; padding: 0 0 10px 15px; border-bottom:1px solid #000;">C Source Program</div>
+    <div style="height:10px;"></div>
+    <div class="code-line" id="line-0">int main() {</div>
+    <div class="code-line" id="line-1">  int count = 10;</div>
+    <div class="code-line" id="line-2">  int* p1 = malloc(sizeof(int));</div>
+    <div class="code-line" id="line-3">  int* p2 = malloc(sizeof(int));</div>
+    <div class="code-line" id="line-4">  p1 = p2;</div>
+    <div class="code-line" id="line-5">  // Triggering Garbage Collector...</div>
+    <div class="code-line" id="line-6">  return 0;</div>
+    <div class="code-line" id="line-7">}</div>
+  </div>
+
+  <div class="panel stack-panel">
+    <div class="panel-title">THE STACK (Variable Creation)</div>
+    <div class="mem-container" id="stackContainer"></div>
+  </div>
+
+  <div class="panel heap-panel">
+    <div class="panel-title">THE HEAP (Physical Allocation & GC)</div>
+    <div class="mem-container" id="heapContainer"></div>
+  </div>
+</div>
+
+<div class="status-box" id="statusBox">
+  Click "Step Code Execution" to run the sample program stack maps.
+</div>
+
+<script>
+const stackContainer = document.getElementById('stackContainer');
+const heapContainer = document.getElementById('heapContainer');
+const statusBox = document.getElementById('statusBox');
+const btnStep = document.getElementById('btnStep');
+const btnReset = document.getElementById('btnReset');
+
+let stepIndex = 0;
+
+const tracePipeline = [
+  {
+    line: 0,
+    status: "<b>Enter main():</b> Runtime environment sets up standard baseline layout parameters for program tracking configurations.",
+    action: () => {
+      stackContainer.innerHTML = `<div class="var-box" id="frame-base"><strong>main() Stack Frame Base</strong></div>`;
+    }
+  },
+  {
+    line: 1,
+    status: "<b>Variable Creation:</b> Primitive local variable <tt>int count</tt> is created instantly inside the active stack frame window. Values are saved inline.",
+    action: () => {
+      const v = document.createElement('div');
+      v.className = "var-box highlight-create";
+      v.id = "var-count";
+      v.innerHTML = `<strong>int count</strong><br>Value: 10<br><div class="meta-txt">Addr: 0x7FFF04</div>`;
+      stackContainer.appendChild(v);
+      setTimeout(() => v.classList.remove('highlight-create'), 400);
+    }
+  },
+  {
+    line: 2,
+    status: "<b>Memory Allocation (malloc 1):</b> The pointer variable <tt>p1</tt> is created on the stack. Concurrently, <tt>malloc()</tt> requests space on the **Heap**, allocating address <tt>0x0A01</tt>.",
+    action: () => {
+      const stk = document.createElement('div');
+      stk.className = "var-box highlight-create";
+      stk.id = "var-p1";
+      stk.innerHTML = `<strong>int* p1 (Pointer)</strong><br>Holds Addr: <span id="p1-val">0x0A01</span><br><div class="meta-txt">Addr: 0x7FFF08</div>`;
+      stackContainer.appendChild(stk);
+      
+      const hp = document.createElement('div');
+      hp.className = "var-box";
+      hp.id = "heap-0x0A01";
+      hp.innerHTML = `<strong>Heap Block: 0x0A01</strong><br>Alloc Size: 4 Bytes<br><div class="meta-txt" id="ref-status-1">Refs: Stack (p1)</div>`;
+      heapContainer.appendChild(hp);
+      
+      setTimeout(() => stk.classList.remove('highlight-create'), 400);
+    }
+  },
+  {
+    line: 3,
+    status: "<b>Memory Allocation (malloc 2):</b> A second pointer <tt>p2</tt> is created on the stack frame, holding the address of a brand new heap chunk block allocated at <tt>0x0B02</tt>.",
+    action: () => {
+      const stk = document.createElement('div');
+      stk.className = "var-box highlight-create";
+      stk.id = "var-p2";
+      stk.innerHTML = `<strong>int* p2 (Pointer)</strong><br>Holds Addr: <span>0x0B02</span><br><div class="meta-txt">Addr: 0x7FFF12</div>`;
+      stackContainer.appendChild(stk);
+      
+      const hp = document.createElement('div');
+      hp.className = "var-box";
+      hp.id = "heap-0x0B02";
+      hp.innerHTML = `<strong>Heap Block: 0x0B02</strong><br>Alloc Size: 4 Bytes<br><div class="meta-txt">Refs: Stack (p2)</div>`;
+      heapContainer.appendChild(hp);
+      
+      setTimeout(() => stk.classList.remove('highlight-create'), 400);
+    }
+  },
+  {
+    line: 4,
+    status: "<b>Pointer Reassignment (Orphaning):</b> Statement <tt>p1 = p2</tt> updates pointer <tt>p1</tt> to address <tt>0x0B02</tt>. Heap address <tt>0x0A01</tt> now has <b>zero active stack references</b> pointing to it. It is orphaned.",
+    action: () => {
+      document.getElementById('p1-val').innerText = "0x0B02";
+      document.getElementById('p1-val').style.fontWeight = "bold";
+      
+      const orphanedHeap = document.getElementById('heap-0x0A01');
+      orphanedHeap.className = "var-box gc-orphan";
+      document.getElementById('ref-status-1').innerHTML = "<b>Refs: 0 (ORPHANED)</b>";
+    }
+  },
+  {
+    line: 5,
+    status: "<b>Garbage Collection Sweep:</b> The automatic tracking manager identifies that heap chunk <tt>0x0A01</tt> has broken bounds and cannot be reached by any stack root. It sweeps the block to free memory.",
+    action: () => {
+      const sweptHeap = document.getElementById('heap-0x0A01');
+      sweptHeap.classList.add('gc-swept');
+      setTimeout(() => { sweptHeap.style.display = "none"; }, 300);
+    }
+  },
+  {
+    line: 6,
+    status: "<b>Function Exit:</b> Program sequence complete. Returning status flag zero.",
+    action: () => {}
+  },
+  {
+    line: 7,
+    status: "<b>Stack Wiped:</b> <tt>main()</tt> scope closes. The entire local stack frame (including <tt>count</tt>, <tt>p1</tt>, and <tt>p2</tt>) is completely popped and wiped automatically.",
+    action: () => {
+      stackContainer.innerHTML = "";
+    }
+  }
+];
+
+function executeNextStep() {
+  if (stepIndex >= tracePipeline.length) {
+    statusBox.innerHTML = "<b>Trace Complete:</b> The entire lifecycle sequence finished safely. Reset sandbox to restart.";
+    document.querySelectorAll('.code-line').forEach(l => l.classList.remove('active'));
+    return;
+  }
+
+  document.querySelectorAll('.code-line').forEach(l => l.classList.remove('active'));
+  
+  const current = tracePipeline[stepIndex];
+  document.getElementById(`line-${current.line}`).classList.add('active');
+  
+  current.action();
+  statusBox.innerHTML = `[Line ${current.line}] ${current.status}`;
+  
+  stepIndex++;
+}
+
+function resetVisualizer() {
+  stepIndex = 0;
+  stackContainer.innerHTML = '';
+  heapContainer.innerHTML = '';
+  document.querySelectorAll('.code-line').forEach(l => l.classList.remove('active'));
+  statusBox.innerHTML = "Click \"Step Code Execution\" to run the sample program stack maps.";
+}
+
+btnStep.addEventListener('click', executeNextStep);
+btnReset.addEventListener('click', resetVisualizer);
+</script>
+</body>
+</html>

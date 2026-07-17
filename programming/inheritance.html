@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>C++ Comprehensive Inheritance & Derivation Visualizer</title>
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: monospace;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  p.sub {
+    margin: 0 0 25px 0;
+    font-size: 0.9rem;
+  }
+  .controls {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 2px solid #000000;
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    padding: 6px 14px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #eeeeee;
+  }
+  button.active {
+    background: #000000;
+    color: #ffffff;
+  }
+  .workspace {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .canvas-border {
+    border: 2px solid #000000;
+    display: inline-block;
+    background: #ffffff;
+  }
+  .status-box {
+    margin-top: 25px;
+    padding: 10px;
+    border: 2px solid #000000;
+    width: 100%;
+    max-width: 800px;
+    min-height: 60px;
+    box-sizing: border-box;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<h1>C++ Comprehensive Inheritance & Derivation Visualizer</h1>
+<p class="sub">Watch data fields (variables) and interfaces (methods) physically migrate and structuralize through all 5 classical types of object inheritance models.</p>
+
+<div class="controls">
+  <button id="btnSingle" class="active">Single</button>
+  <button id="btnMultiple">Multiple</button>
+  <button id="btnHierarchical">Hierarchical</button>
+  <button id="btnMultilevel">Multilevel</button>
+  <button id="btnHybrid">Hybrid (Diamond)</button>
+</div>
+
+<div class="workspace">
+  <div class="canvas-border">
+    <canvas id="animCanvas" width="800" height="460"></canvas>
+  </div>
+</div>
+
+<div class="status-box" id="statusBox">
+  Select an inheritance scheme above to trigger the structural code assembly animation.
+</div>
+
+<script>
+const canvas = document.getElementById('animCanvas');
+const ctx = canvas.getContext('2d');
+const statusBox = document.getElementById('statusBox');
+
+let currentMode = 'single';
+let particles = [];
+let animationFrameId = null;
+let animProgress = 0;
+
+const layouts = {
+  single: {
+    desc: "<b>1. Single Inheritance:</b> A basic model where one Derived child inherits directly from one Base parent class. Memory scales sequentially by copying base layouts first.",
+    setup: () => ({
+      parents: [{ x: 320, y: 40, title: "Class Base", vars: ["int x", "void print()"] }],
+      children: [{ x: 320, y: 260, title: "Class Derived : public Base", vars: ["[Inherited x]", "[Inherited print()]", "int y", "void show()"] }],
+      streams: [
+        { fromType: 'parent', fromIdx: 0, fromV: 0, toIdx: 0, toV: 0, stage: 1 },
+        { fromType: 'parent', fromIdx: 0, fromV: 1, toIdx: 0, toV: 1, stage: 1 }
+      ]
+    })
+  },
+  multiple: {
+    desc: "<b>2. Multiple Inheritance:</b> A child class derives structural fields from two or more independent base parents. In memory, parent frames stack sequentially in declaration order.",
+    setup: () => ({
+      parents: [
+        { x: 180, y: 40, title: "Class BaseA", vars: ["int a", "void fnA()"] },
+        { x: 460, y: 40, title: "Class BaseB", vars: ["int b", "void fnB()"] }
+      ],
+      children: [{ x: 320, y: 260, title: "Class Derived : public BaseA, BaseB", vars: ["[Inherited a]", "[Inherited fnA()]", "[Inherited b]", "[Inherited fnB()]", "int d"] }],
+      streams: [
+        { fromType: 'parent', fromIdx: 0, fromV: 0, toIdx: 0, toV: 0, stage: 1 },
+        { fromType: 'parent', fromIdx: 0, fromV: 1, toIdx: 0, toV: 1, stage: 1 },
+        { fromType: 'parent', fromIdx: 1, fromV: 0, toIdx: 0, toV: 2, stage: 1 },
+        { fromType: 'parent', fromIdx: 1, fromV: 1, toIdx: 0, toV: 3, stage: 1 }
+      ]
+    })
+  },
+  hierarchical: {
+    desc: "<b>3. Hierarchical Inheritance:</b> A shared singular parent base class branches outward into multiple independent child streams, serving as a template for distinct subsystems.",
+    setup: () => ({
+      parents: [{ x: 320, y: 40, title: "Class Base", vars: ["int data", "void run()"] }],
+      children: [
+        { x: 140, y: 260, title: "Class ChildA : public Base", vars: ["[Inherited data]", "[Inherited run()]", "int localA"] },
+        { x: 500, y: 260, title: "Class ChildB : public Base", vars: ["[Inherited data]", "[Inherited run()]", "int localB"] }
+      ],
+      streams: [
+        { fromType: 'parent', fromIdx: 0, fromV: 0, toIdx: 0, toV: 0, stage: 1 },
+        { fromType: 'parent', fromIdx: 0, fromV: 1, toIdx: 0, toV: 1, stage: 1 },
+        { fromType: 'parent', fromIdx: 0, fromV: 0, toIdx: 1, toV: 0, stage: 1 },
+        { fromType: 'parent', fromIdx: 0, fromV: 1, toIdx: 1, toV: 1, stage: 1 }
+      ]
+    })
+  },
+  multilevel: {
+    desc: "<b>4. Multilevel Inheritance:</b> A linear generational chain (Grandparent $\rightarrow$ Parent $\rightarrow$ Child). Class C inherits from Class B, which builds on top of Class A.",
+    setup: () => ({
+      parents: [{ x: 320, y: 20, title: "Class A (Grandparent)", vars: ["int gData"] }],
+      children: [
+        { x: 320, y: 150, title: "Class B : public A (Parent)", vars: ["[Inherited gData]", "int pData"] },
+        { x: 320, y: 300, title: "Class C : public B (Child)", vars: ["[Inherited gData]", "[Inherited pData]", "int cData"] }
+      ],
+      streams: [
+        { fromType: 'parent', fromIdx: 0, fromV: 0, toIdx: 0, toV: 0, stage: 1 },
+        { fromType: 'child', fromIdx: 0, fromV: 0, toIdx: 1, toV: 0, stage: 2 },
+        { fromType: 'child', fromIdx: 0, fromV: 1, toIdx: 1, toV: 1, stage: 2 }
+      ]
+    })
+  },
+  hybrid: {
+    desc: "<b>5. Hybrid (Diamond) Inheritance:</b> A complex setup combining Multilevel and Multiple traits. Notice how <tt>gData</tt> is duplicated through both Parent paths into the final Child, causing ambiguity unless resolved with <tt>virtual</tt> inheritance.",
+    setup: () => ({
+      parents: [{ x: 320, y: 20, title: "Class Top (Grandparent)", vars: ["int gData"] }],
+      children: [
+        { x: 140, y: 150, title: "Class Left : public Top", vars: ["[Inherited gData]", "int lVal"] },
+        { x: 500, y: 150, title: "Class Right : public Top", vars: ["[Inherited gData]", "int rVal"] },
+        { x: 320, y: 300, title: "Class Bottom : public Left, Right", vars: ["[Left::gData]", "[Inherited lVal]", "[Right::gData]", "[Inherited rVal]", "int bVal"] }
+      ],
+      streams: [
+        // Top to Left/Right (Stage 1)
+        { fromType: 'parent', fromIdx: 0, fromV: 0, toIdx: 0, toV: 0, stage: 1 },
+        { fromType: 'parent', fromIdx: 0, fromV: 0, toIdx: 1, toV: 0, stage: 1 },
+        // Left/Right to Bottom (Stage 2)
+        { fromType: 'child', fromIdx: 0, fromV: 0, toIdx: 2, toV: 0, stage: 2 },
+        { fromType: 'child', fromIdx: 0, fromV: 1, toIdx: 2, toV: 1, stage: 2 },
+        { fromType: 'child', fromIdx: 1, fromV: 0, toIdx: 2, toV: 2, stage: 2 },
+        { fromType: 'child', fromIdx: 1, fromV: 1, toIdx: 2, toV: 3, stage: 2 }
+      ]
+    })
+  }
+};
+
+let activeLayout = layouts[currentMode].setup();
+
+function initAnimation(mode) {
+  currentMode = mode;
+  activeLayout = layouts[mode].setup();
+  statusBox.innerHTML = layouts[mode].desc;
+  
+  particles = [];
+  animProgress = 0;
+  
+  activeLayout.streams.forEach(stream => {
+    const sourceNode = stream.fromType === 'parent' ? activeLayout.parents[stream.fromIdx] : activeLayout.children[stream.fromIdx];
+    const targetNode = activeLayout.children[stream.toIdx];
+    
+    const sourceW = stream.fromType === 'parent' ? 160 : 240;
+    const startX = sourceNode.x + (sourceW / 2);
+    const startY = sourceNode.y + 30 + (stream.fromV * 24);
+    
+    const endX = targetNode.x + 120;
+    const endY = targetNode.y + 30 + (stream.toV * 24);
+    
+    particles.push({
+      sx: startX, sy: startY,
+      ex: endX, ey: endY,
+      cx: startX, cy: startY,
+      label: sourceNode.vars[stream.fromV],
+      stage: stream.stage
+    });
+  });
+  
+  if(animationFrameId) cancelAnimationFrame(animationFrameId);
+  tick();
+}
+
+function tick() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // 1. Draw Structure Relationship Links
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  activeLayout.streams.forEach(stream => {
+    const sourceNode = stream.fromType === 'parent' ? activeLayout.parents[stream.fromIdx] : activeLayout.children[stream.fromIdx];
+    const targetNode = activeLayout.children[stream.toIdx];
+    const sourceW = stream.fromType === 'parent' ? 160 : 240;
+    
+    ctx.beginPath();
+    ctx.moveTo(sourceNode.x + (sourceW / 2), sourceNode.y + 25);
+    ctx.lineTo(targetNode.x + 120, targetNode.y + 5);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]); 
+
+  // 2. Render Top Level Parents
+  activeLayout.parents.forEach(p => {
+    drawClassBox(p.x, p.y, p.title, p.vars, false);
+  });
+
+  // 3. Render Child Classes Blocks
+  activeLayout.children.forEach((c, index) => {
+    let localProgress = animProgress;
+    // Delayed step execution throttle for generational trees
+    if ((currentMode === 'multilevel' || currentMode === 'hybrid') && c.title.includes('Child') || c.title.includes('Bottom')) {
+      localProgress = Math.max(0, (animProgress - 0.5) * 2);
+    } else if (currentMode === 'multilevel' && index === 0) {
+      localProgress = Math.min(1, animProgress * 2);
+    } else if (currentMode === 'hybrid' && (index === 0 || index === 1)) {
+      localProgress = Math.min(1, animProgress * 2);
+    }
+    drawClassBox(c.x, c.y, c.title, c.vars, true, localProgress);
+  });
+
+  // 4. Update Engine Particles Position Vectors
+  if (animProgress < 1) {
+    animProgress += 0.006; 
+    if (animProgress > 1) animProgress = 1;
+  }
+
+  particles.forEach(p => {
+    let pProgress = animProgress;
+    
+    if (currentMode === 'multilevel' || currentMode === 'hybrid') {
+      if (p.stage === 1) {
+        pProgress = Math.min(1, animProgress * 2);
+      } else {
+        pProgress = Math.max(0, (animProgress - 0.5) * 2);
+      }
+    }
+
+    p.cx = p.sx + (p.ex - p.sx) * pProgress;
+    p.cy = p.sy + (p.ey - p.sy) * pProgress;
+
+    if (pProgress > 0) {
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.arc(p.cx, p.cy, 5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.font = '9px monospace';
+      ctx.fillText(p.label.replace('[', '').split(' ')[0], p.cx + 8, p.cy + 3);
+    }
+  });
+
+  animationFrameId = requestAnimationFrame(tick);
+}
+
+function drawClassBox(x, y, title, vars, isChild, progress = 1) {
+  const w = isChild ? 240 : 160;
+  const rowH = 24;
+  const headerH = 30;
+  const totalH = headerH + (vars.length * rowH);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  ctx.fillRect(x, y, w, totalH);
+  ctx.strokeRect(x, y, w, totalH);
+
+  ctx.fillStyle = '#eeeeee';
+  ctx.fillRect(x + 1, y + 1, w - 2, headerH - 1);
+  ctx.beginPath();
+  ctx.moveTo(x, y + headerH);
+  ctx.lineTo(x + w, y + headerH);
+  ctx.stroke();
+
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, x + (w / 2), y + 18);
+  ctx.textAlign = 'left';
+
+  vars.forEach((v, index) => {
+    const rowY = y + headerH + (index * rowH);
+    
+    if(index > 0) {
+      ctx.strokeStyle = '#eeeeee';
+      ctx.beginPath();
+      ctx.moveTo(x + 4, rowY);
+      ctx.lineTo(x + w - 4, rowY);
+      ctx.stroke();
+    }
+
+    const isInherited = v.startsWith('[');
+    
+    if (isChild && isInherited) {
+      ctx.fillStyle = `rgba(0, 0, 0, ${progress})`;
+      if (progress >= 0.95) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x + 2, rowY + 1, w - 4, rowH - 2);
+        ctx.fillStyle = '#000000';
+        ctx.strokeRect(x + 4, rowY + 3, w - 8, rowH - 6);
+      }
+    } else {
+      ctx.fillStyle = '#000000';
+    }
+
+    ctx.font = '11px monospace';
+    ctx.fillText(v, x + 12, rowY + 16);
+  });
+}
+
+function changeMode(mode, targetBtn) {
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  targetBtn.classList.add('active');
+  initAnimation(mode);
+}
+
+document.getElementById('btnSingle').addEventListener('click', (e) => changeMode('single', e.target));
+document.getElementById('btnMultiple').addEventListener('click', (e) => changeMode('multiple', e.target));
+document.getElementById('btnHierarchical').addEventListener('click', (e) => changeMode('hierarchical', e.target));
+document.getElementById('btnMultilevel').addEventListener('click', (e) => changeMode('multilevel', e.target));
+document.getElementById('btnHybrid').addEventListener('click', (e) => changeMode('hybrid', e.target));
+
+initAnimation('single');
+</script>
+</body>
+</html>
